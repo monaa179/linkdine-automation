@@ -1,0 +1,98 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum AccountType {
+  personal
+  company
+}
+
+enum PostingPeriod {
+  week
+}
+
+enum PostingDay {
+  monday
+  tuesday
+  wednesday
+  thursday
+  friday
+  saturday
+  sunday
+}
+
+enum PostStatus {
+  draft
+  scheduled
+  published
+}
+
+// ==========================================
+// MODELS
+// ==========================================
+
+model User {
+  id           Int               @id @default(autoincrement())
+  email        String            @unique
+  passwordHash String
+  createdAt    DateTime          @default(now())
+  
+  // Relations
+  linkedinAccounts LinkedInAccount[]
+  
+  @@map("users")
+}
+
+model LinkedInAccount {
+  id                 Int           @id @default(autoincrement())
+  userId             Int
+  name               String
+  type               AccountType
+  linkedinAccountId  String
+  linkedinPageId     String?
+  accessToken        String        @db.Text
+  refreshToken       String?       @db.Text
+  tokenExpiresAt     DateTime
+  contextPrompt      String        @db.Text
+  postingFrequency   Int           @default(1)
+  postingPeriod      PostingPeriod @default(week)
+  postingDay         PostingDay    @default(monday)
+  postingHour        String        @default("09:00")
+  createdAt          DateTime      @default(now())
+  
+  // Relations
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts Post[]
+  
+  @@map("linkedin_accounts")
+}
+
+model Post {
+  id                 Int        @id @default(autoincrement())
+  linkedinAccountId  Int
+  imageUrl           String
+  imageDescription   String?    @db.Text
+  aiCaption          String     @db.Text
+  editedCaption      String?    @db.Text
+  status             PostStatus @default(draft)
+  scheduledAt        DateTime?
+  publishedAt        DateTime?
+  createdAt          DateTime   @default(now())
+  
+  // Relations
+  linkedinAccount LinkedInAccount @relation(fields: [linkedinAccountId], references: [id], onDelete: Cascade)
+  
+  @@map("posts")
+}
