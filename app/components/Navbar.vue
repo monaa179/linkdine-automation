@@ -19,10 +19,12 @@
 
       <div class="divider"></div>
 
-      <div class="date-display">
-        <Calendar :size="18" />
-        <span>{{ currentDate }}</span>
-      </div>
+      <ClientOnly>
+        <div class="date-display">
+          <Calendar :size="18" />
+          <span>{{ currentDate }}</span>
+        </div>
+      </ClientOnly>
     </div>
   </header>
 </template>

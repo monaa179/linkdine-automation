@@ -9,127 +9,94 @@
         <h1 class="title">Nouveau Post</h1>
       </div>
 
-      <div class="creation-grid">
-        <!-- Editor Section -->
-        <div class="editor-section">
-          <BaseCard>
-            <form @submit.prevent="handleSubmit" class="post-form">
-              <!-- Account Selection -->
-              <div class="form-group">
-                <label>Compte LinkedIn</label>
-                <select v-model="form.linkedinAccountId" class="custom-select" required>
-                  <option value="" disabled>Sélectionner un compte</option>
-                  <option v-for="acc in accounts" :key="acc.id" :value="acc.id">
-                    {{ acc.name }} ({{ acc.type }})
-                  </option>
-                </select>
-                <p v-if="accounts.length === 0" class="hint">
-                  Aucun compte connecté. <NuxtLink to="/dashboard/accounts">Connecter un compte</NuxtLink>
-                </p>
+      <div v-if="currentAccountId" class="upload-container">
+        <BaseCard>
+          <div class="upload-info">
+            <h2>Télécharger des images</h2>
+            <p>Téléchargez une ou plusieurs images pour le compte <strong>{{ currentAccount?.name }}</strong>. Un post sera créé pour chaque image.</p>
+          </div>
+
+          <form @submit.prevent="handleSubmit" class="post-form">
+            <!-- Multi-Image Upload -->
+            <div class="form-group">
+              <label>Images des posts (Max 10)</label>
+              <div 
+                class="dropzone" 
+                :class="{ dragover, hasImages: selectedFiles.length > 0 }"
+                @dragover.prevent="dragover = true"
+                @dragleave.prevent="dragover = false"
+                @drop.prevent="handleDrop"
+                @click="fileInput?.click()"
+              >
+                <input 
+                  type="file" 
+                  ref="fileInput" 
+                  class="hidden" 
+                  accept="image/*" 
+                  multiple
+                  @change="handleFileSelect" 
+                />
+                
+                <div class="dropzone-content">
+                  <Upload :size="32" />
+                  <p>Cliquez ou glissez vos images ici</p>
+                  <span class="sub-hint">JPG, PNG, WebP (max 10MB par image)</span>
+                </div>
               </div>
 
-              <!-- Image Upload -->
-              <div class="form-group">
-                <label>Image du post</label>
-                <div 
-                  class="dropzone" 
-                  :class="{ dragover, hasImage: !!previewUrl }"
-                  @dragover.prevent="dragover = true"
-                  @dragleave.prevent="dragover = false"
-                  @drop.prevent="handleDrop"
-                  @click="$refs.fileInput.click()"
-                >
-                  <input 
-                    type="file" 
-                    ref="fileInput" 
-                    class="hidden" 
-                    accept="image/*" 
-                    @change="handleFileSelect" 
-                  />
-                  
-                  <div v-if="!previewUrl" class="dropzone-content">
-                    <Upload :size="32" />
-                    <p>Cliquez ou glissez une image ici</p>
-                    <span class="sub-hint">JPG, PNG, WebP (max 10MB)</span>
+              <!-- Selected Files Preview -->
+              <div v-if="selectedFiles.length > 0" class="files-preview-grid">
+                <div v-for="(file, index) in selectedFiles" :key="index" class="file-preview-item">
+                  <div class="preview-mini-container">
+                    <img :src="file.preview" alt="Preview" class="mini-preview" />
+                    <button type="button" class="remove-file-btn" @click.stop="removeFile(index)">
+                      <X :size="14" />
+                    </button>
                   </div>
-                  <div v-else class="preview-container">
-                    <img :src="previewUrl" alt="Preview" class="image-preview" />
-                    <div class="preview-overlay">
-                      <RefreshCw :size="24" />
-                      <span>Changer l'image</span>
-                    </div>
-                  </div>
+                  <span class="file-name">{{ file.name }}</span>
                 </div>
-                <div v-if="uploading" class="upload-progress">
+              </div>
+
+              <div v-if="uploading" class="upload-progress-container">
+                <div class="progress-info">
+                  <span>Téléchargement en cours...</span>
+                </div>
+                <div class="progress-bar-bg">
                   <div class="progress-bar" :style="{ width: uploadProgress + '%' }"></div>
                 </div>
               </div>
-
-              <!-- AI Context -->
-              <div class="form-group">
-                <label>Description pour l'IA (optionnel)</label>
-                <textarea 
-                  v-model="form.imageDescription" 
-                  placeholder="Décrivez ce que vous voulez que l'IA mette en avant dans ce post..."
-                  rows="4"
-                  class="custom-textarea"
-                ></textarea>
-                <p class="hint">Utilisé par l'IA pour générer une légende pertinente.</p>
-              </div>
-
-              <div class="form-actions">
-                <BaseButton 
-                  type="submit" 
-                  :loading="submitting" 
-                  :disabled="!isFormValid"
-                  class="submit-btn"
-                >
-                  Générer et Programmer
-                </BaseButton>
-                <p class="disclaimer">
-                  En cliquant, l'IA générera une légende basée sur votre image et vos paramètres.
-                </p>
-              </div>
-            </form>
-          </BaseCard>
-        </div>
-
-        <!-- Preview Section -->
-        <div class="preview-section">
-          <div class="sticky-preview">
-            <h3 class="preview-title">Aperçu LinkedIn</h3>
-            <div class="linkedin-preview glass">
-              <div class="preview-header">
-                <div class="preview-avatar"></div>
-                <div class="preview-user-meta">
-                  <div class="skeleton-line name"></div>
-                  <div class="skeleton-line sub"></div>
-                </div>
-              </div>
-              <div class="preview-body">
-                <div class="preview-text">
-                  <template v-if="form.imageDescription">
-                    <span class="context-tag">[Contexte IA]</span> {{ form.imageDescription }}
-                  </template>
-                  <template v-else>
-                    <div class="skeleton-line text"></div>
-                    <div class="skeleton-line text short"></div>
-                  </template>
-                </div>
-                <div v-if="previewUrl" class="preview-image">
-                  <img :src="previewUrl" alt="Post content" />
-                </div>
-                <div v-else class="preview-image-placeholder">
-                  <Image :size="48" />
-                </div>
-              </div>
-              <div class="preview-footer">
-                <div class="footer-action"><ThumbsUp :size="16" /> J'aime</div>
-                <div class="footer-action"><MessageSquare :size="16" /> Commenter</div>
-                <div class="footer-action"><Share2 :size="16" /> Partager</div>
-              </div>
             </div>
+
+            <div class="form-actions">
+              <BaseButton 
+                type="submit" 
+                :loading="submitting" 
+                :disabled="!isFormValid"
+                class="submit-btn"
+              >
+                Créer les {{ selectedFiles.length }} posts
+              </BaseButton>
+              <p class="disclaimer">
+                Chaque image créera un post en mode brouillon pour <strong>{{ currentAccount?.name }}</strong>. L'IA générera ensuite les légendes.
+              </p>
+            </div>
+          </form>
+        </BaseCard>
+      </div>
+
+      <!-- No Account Selected Overlay -->
+      <div v-else class="account-selector-overlay">
+        <div class="overlay-content">
+          <div class="icon-pulse">
+            <Link2 :size="48" />
           </div>
+          <h2>Aucun compte sélectionné</h2>
+          <p>Vous devez sélectionner un compte LinkedIn avant de pouvoir créer des publications.</p>
+          <NuxtLink to="/dashboard/accounts">
+            <BaseButton variant="primary" size="lg">
+              Sélectionner un compte
+            </BaseButton>
+          </NuxtLink>
         </div>
       </div>
     </div>
@@ -140,11 +107,13 @@
 import { 
   ChevronLeft, 
   Upload, 
+  X,
   RefreshCw, 
   Image, 
   ThumbsUp, 
   MessageSquare, 
-  Share2 
+  Share2,
+  Link2
 } from 'lucide-vue-next'
 
 definePageMeta({
@@ -152,27 +121,27 @@ definePageMeta({
   middleware: ['auth']
 })
 
-const accounts = ref([])
+const { currentAccountId, currentAccount, fetchCurrentAccount } = useCurrentAccount()
+const accounts = ref<any[]>([])
+const fileInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const dragover = ref(false)
 const uploadProgress = ref(0)
-const previewUrl = ref('')
 const submitting = ref(false)
+const selectedFiles = ref<any[]>([]) // { file: File, preview: string, name: string }
 
 const form = reactive({
-  linkedinAccountId: '',
-  imageUrl: '',
-  imageDescription: ''
+  accountId: ''
 })
 
 const isFormValid = computed(() => {
-  return form.linkedinAccountId && form.imageUrl
+  return currentAccountId.value && selectedFiles.value.length > 0
 })
 
 const fetchAccounts = async () => {
   try {
-    const data = await $fetch('/api/linkedin/accounts')
-    accounts.value = data.accounts
+    const data = await $fetch<any[]>('/api/accounts')
+    accounts.value = data
   } catch (e) {
     console.error('Failed to fetch accounts', e)
   }
@@ -180,64 +149,73 @@ const fetchAccounts = async () => {
 
 const handleFileSelect = (e: Event) => {
   const files = (e.target as HTMLInputElement).files
-  if (files?.length) uploadFile(files[0])
+  if (files) addFiles(Array.from(files))
 }
 
 const handleDrop = (e: DragEvent) => {
   dragover.value = false
   const files = e.dataTransfer?.files
-  if (files?.length) uploadFile(files[0])
+  if (files) addFiles(Array.from(files))
 }
 
-const uploadFile = async (file: File) => {
-  if (!file.type.startsWith('image/')) {
-    alert('Veuillez sélectionner une image.')
+const addFiles = (files: File[]) => {
+  const imageFiles = files.filter(f => f.type.startsWith('image/'))
+  
+  if (imageFiles.length + selectedFiles.value.length > 10) {
+    alert('Maximum 10 images par envoi.')
     return
   }
 
-  uploading.value = true
-  uploadProgress.value = 0
+  imageFiles.forEach(file => {
+    selectedFiles.value.push({
+      file,
+      name: file.name,
+      preview: URL.createObjectURL(file)
+    })
+  })
+}
+
+const removeFile = (index: number) => {
+  const removed = selectedFiles.value.splice(index, 1)[0]
+  if (removed.preview) URL.revokeObjectURL(removed.preview)
+}
+
+const handleSubmit = async () => {
+  if (!isFormValid.value || selectedFiles.value.length === 0) return
   
-  // Create preview instantly
-  previewUrl.value = URL.createObjectURL(file)
+  submitting.value = true
+  uploading.value = true
+  uploadProgress.value = 10
 
   const formData = new FormData()
-  formData.append('image', file)
+  formData.append('accountId', String(currentAccountId.value))
+  
+  selectedFiles.value.forEach(f => {
+    formData.append('images', f.file)
+  })
 
   try {
-    const response = await $fetch('/api/uploads/image', {
+    uploadProgress.value = 40
+    await $fetch('/api/posts/bulk-upload', {
       method: 'POST',
       body: formData
     })
-    form.imageUrl = response.url
+    uploadProgress.value = 100
+    navigateTo('/dashboard/posts')
   } catch (e) {
-    alert("L'upload a échoué.")
+    alert('Erreur lors de la création des posts.')
   } finally {
+    submitting.value = false
     uploading.value = false
   }
 }
 
-const handleSubmit = async () => {
-  if (!isFormValid.value) return
-  
-  submitting.value = true
-  try {
-    await $fetch('/api/posts', {
-      method: 'POST',
-      body: {
-        ...form,
-        linkedinAccountId: parseInt(form.linkedinAccountId)
-      }
-    })
-    navigateTo('/dashboard/posts')
-  } catch (e) {
-    alert('Erreur lors de la création du post.')
-  } finally {
-    submitting.value = false
+onMounted(async () => {
+  await fetchAccounts()
+  if (currentAccountId.value && !currentAccount.value) {
+    await fetchCurrentAccount()
   }
-}
-
-onMounted(fetchAccounts)
+})
 </script>
 
 <style scoped>
@@ -247,33 +225,23 @@ onMounted(fetchAccounts)
   gap: 2rem;
 }
 
-.page-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.upload-container {
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-.back-link {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
+.upload-info {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.upload-info h2 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.upload-info p {
   color: var(--text-secondary);
-  font-size: 0.875rem;
-}
-
-.back-link:hover {
-  color: var(--text-primary);
-}
-
-.title {
-  font-size: 2rem;
-}
-
-.creation-grid {
-  display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: 2.5rem;
-  align-items: start;
 }
 
 .post-form {
@@ -313,7 +281,7 @@ onMounted(fetchAccounts)
 .dropzone {
   border: 2px dashed var(--border-glass);
   border-radius: 1rem;
-  padding: 3rem 2rem;
+  padding: 4rem 2rem;
   text-align: center;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -339,38 +307,86 @@ onMounted(fetchAccounts)
   opacity: 0.7;
 }
 
-.preview-container {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16/9;
-  border-radius: 0.5rem;
-  overflow: hidden;
+.files-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
 }
 
-.image-preview {
+.file-preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.preview-mini-container {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--border-glass);
+}
+
+.mini-preview {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.preview-overlay {
+.remove-file-btn {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  opacity: 0;
-  transition: opacity var(--transition-fast);
+  border: none;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: all var(--transition-fast);
 }
 
-.preview-container:hover .preview-overlay {
-  opacity: 1;
+.remove-file-btn:hover {
+  background: var(--accent-error, #ef4444);
+  transform: scale(1.1);
+}
+
+.file-name {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.upload-progress-container {
+  margin-top: 1.5rem;
+}
+
+.progress-info {
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  color: var(--accent-primary);
+}
+
+.progress-bar-bg {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--accent-primary);
+  transition: width 0.3s ease;
 }
 
 .hint {
@@ -395,111 +411,5 @@ onMounted(fetchAccounts)
   line-height: 1.4;
 }
 
-/* LinkedIn Preview Styling */
-.sticky-preview {
-  position: sticky;
-  top: 100px;
-}
-
-.preview-title {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 1rem;
-}
-
-.linkedin-preview {
-  border-radius: 0.75rem;
-  overflow: hidden;
-  background: #ffffff02;
-}
-
-.preview-header {
-  padding: 1rem;
-  display: flex;
-  gap: 0.75rem;
-}
-
-.preview-avatar {
-  width: 40px;
-  height: 40px;
-  background: #334155;
-  border-radius: 50%;
-}
-
-.preview-user-meta {
-  flex: 1;
-}
-
-.skeleton-line {
-  height: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-}
-
-.skeleton-line.name { width: 120px; margin-bottom: 6px; }
-.skeleton-line.sub { width: 80px; }
-.skeleton-line.text { width: 100%; margin-bottom: 8px; }
-.skeleton-line.text.short { width: 60%; }
-
-.preview-body {
-  padding: 0 1rem 1rem;
-}
-
-.preview-text {
-  font-size: 0.875rem;
-  margin-bottom: 1rem;
-  color: #e2e8f0;
-}
-
-.context-tag {
-  color: var(--accent-primary);
-  font-weight: 600;
-}
-
-.preview-image {
-  margin: 0 -1rem;
-  max-height: 300px;
-  overflow: hidden;
-}
-
-.preview-image img {
-  width: 100%;
-  display: block;
-}
-
-.preview-image-placeholder {
-  height: 200px;
-  background: rgba(0, 0, 0, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.05);
-}
-
-.preview-footer {
-  display: flex;
-  padding: 0.5rem 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.footer-action {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  padding: 0.5rem;
-}
-
 .hidden { display: none; }
-
-@media (max-width: 900px) {
-  .creation-grid {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

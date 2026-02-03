@@ -1,31 +1,12 @@
-import { prisma } from '../../utils/prisma'
-import { requireAuth } from '../../utils/auth'
+import { getUserFromEvent } from '../../utils/auth'
 
-export default defineEventHandler(async (event) => {
-    const auth = requireAuth(event)
-
-    const user = await prisma.user.findUnique({
-        where: { id: auth.userId },
-        select: {
-            id: true,
-            email: true,
-            createdAt: true,
-            linkedinAccounts: {
-                select: {
-                    id: true,
-                    name: true,
-                    type: true
-                }
-            }
-        }
-    })
-
+export default defineEventHandler((event) => {
+    const user = getUserFromEvent(event)
     if (!user) {
         throw createError({
-            statusCode: 404,
-            statusMessage: 'User not found'
+            statusCode: 401,
+            statusMessage: 'Unauthorized'
         })
     }
-
-    return { user }
+    return user
 })

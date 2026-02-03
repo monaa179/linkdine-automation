@@ -21,13 +21,9 @@ export default defineNuxtConfig({
     uploadDir: process.env.UPLOAD_DIR || './uploads',
   },
 
-  nitro: {
-    publicAssets: [
-      {
-        baseURL: '/uploads',
-        dir: './uploads',
-        maxAge: 60 * 60 * 24 * 7 // 7 days cache
-      }
-    ]
+  vite: {
+    server: {
+      allowedHosts: ['romeo-syntypic-gruesomely.ngrok-free.dev']
+    }
   }
 })

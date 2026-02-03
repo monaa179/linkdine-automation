@@ -1,17 +1,32 @@
 <template>
   <NuxtLayout name="dashboard">
     <div class="posts-page">
-      <div class="page-header">
-        <div class="header-content">
-          <h1 class="title">Mes Posts</h1>
-          <p class="subtitle">Gérez vos publications LinkedIn programmées et publiées.</p>
+      <ClientOnly>
+        <div class="page-header">
+          <div class="header-content">
+            <h1 class="title">Mes Posts</h1>
+            <p v-if="currentAccount" class="subtitle">Gérez vos publications LinkedIn pour <strong>{{ currentAccount.name }}</strong>.</p>
+            <p v-else class="subtitle">Gérez vos publications LinkedIn programmées et publiées.</p>
+          </div>
+          <NuxtLink v-if="currentAccountId" to="/dashboard/posts/create">
+            <BaseButton>
+              <Plus :size="18" />
+              Créer un Post
+            </BaseButton>
+          </NuxtLink>
         </div>
-        <NuxtLink to="/dashboard/posts/create">
-          <BaseButton>
-            <Plus :size="18" />
-            Créer un Post
-          </BaseButton>
-        </NuxtLink>
+      </ClientOnly>
+
+      <!-- No Account Selected Overlay -->
+      <div v-if="!currentAccountId && !loading" class="account-selector-overlay glass-heavy animate-fade-in">
+        <div class="overlay-content">
+          <div class="overlay-icon"><User :size="48" /></div>
+          <h2>Aucun compte sélectionné</h2>
+          <p>Choisissez un compte pour voir ses publications associées.</p>
+          <NuxtLink to="/dashboard/accounts">
+            <BaseButton variant="primary" size="lg">Voir les comptes</BaseButton>
+          </NuxtLink>
+        </div>
       </div>
 
       <!-- Filters -->
@@ -50,90 +65,102 @@
       <div v-else class="posts-grid">
         <BaseCard v-for="post in posts" :key="post.id" class="post-card" interactive @click="viewPost(post)">
           <div class="post-image-wrapper">
-            <img :src="post.imageUrl" :alt="post.aiCaption" class="post-image" />
+            <img :src="post.imageUrl" :alt="post.aiCaption || 'LinkedIn post image'" class="post-image" />
             <div class="status-badge" :class="post.status.toLowerCase()">
-              {{ post.status }}
+              {{ post.status === 'draft' ? 'Brouillon' : post.status === 'scheduled' ? 'Programmé' : 'Publié' }}
             </div>
           </div>
           
           <div class="post-content">
-            <p class="post-caption">{{ post.editedCaption || post.aiCaption }}</p>
+            <div v-if="post.status === 'draft' && !post.aiCaption && !post.editedCaption" class="caption-loading">
+              <RefreshCw :size="20" class="spin" />
+              <span>Génération de la légende...</span>
+            </div>
+            <p v-else class="post-caption">{{ post.editedCaption || post.aiCaption }}</p>
+            
+            <div class="post-actions" v-if="post.status === 'draft'">
+              <BaseButton variant="primary" size="sm" class="cta-btn">
+                <Edit :size="14" />
+                Editer & Programmer
+              </BaseButton>
+            </div>
+
             <div class="post-meta">
               <div class="meta-item">
                 <Calendar :size="14" />
                 <span>{{ post.scheduledAt ? formatDate(post.scheduledAt) : formatDate(post.createdAt) }}</span>
               </div>
-              <div class="meta-item" v-if="post.linkedinAccount">
+              <div class="meta-item" v-if="post.account">
                 <User :size="14" />
-                <span>{{ post.linkedinAccount.name }}</span>
+                <span>{{ post.account.name }}</span>
               </div>
             </div>
           </div>
         </BaseCard>
-      </div>
-
-      <!-- Pagination (Simple) -->
-      <div v-if="pagination.totalPages > 1" class="pagination">
-        <BaseButton 
-          variant="secondary" 
-          size="sm" 
-          :disabled="page === 1"
-          @click="page--"
-        >
-          Précédent
-        </BaseButton>
-        <span class="page-info">Page {{ page }} sur {{ pagination.totalPages }}</span>
-        <BaseButton 
-          variant="secondary" 
-          size="sm" 
-          :disabled="page === pagination.totalPages"
-          @click="page++"
-        >
-          Suivant
-        </BaseButton>
       </div>
     </div>
   </NuxtLayout>
 </template>
 
 <script setup lang="ts">
-import { Plus, Search, FileText, Calendar, User } from 'lucide-vue-next'
+import { Plus, Search, FileText, Calendar, User, RefreshCw, Edit, Link2 } from 'lucide-vue-next'
 
 definePageMeta({
   layout: false,
   middleware: ['auth']
 })
 
+const { currentAccountId, currentAccount, fetchCurrentAccount } = useCurrentAccount()
 const loading = ref(true)
-const posts = ref([])
-const pagination = ref({ totalPages: 0 })
-const page = ref(1)
+const posts = ref<any[]>([])
 const status = ref('all')
 const search = ref('')
 
 const statuses = [
   { label: 'Tous', value: 'all' },
-  { label: 'Programmés', value: 'SCHEDULED' },
-  { label: 'Publiés', value: 'PUBLISHED' },
-  { label: 'Brouillons', value: 'DRAFT' },
+  { label: 'Programmés', value: 'scheduled' },
+  { label: 'Publiés', value: 'published' },
+  { label: 'Brouillons', value: 'draft' },
 ]
 
-const fetchPosts = async () => {
-  loading.value = true
+const fetchPosts = async (showLoading = true) => {
+  if (showLoading) loading.value = true
   try {
-    const params = new URLSearchParams()
-    params.append('page', page.value.toString())
-    if (status.value !== 'all') params.append('status', status.value)
+    if (currentAccountId.value) {
+      await fetchCurrentAccount()
+      const data = await $fetch<any[]>(`/api/posts?accountId=${currentAccountId.value}`)
+      posts.value = data
+    } else {
+      posts.value = []
+    }
     
-    const data = await $fetch(`/api/posts?${params.toString()}`)
-    posts.value = data.posts
-    pagination.value = data.pagination
+    // If any post is in draft and missing caption, start polling
+    checkPolling()
   } catch (e) {
     console.error('Failed to fetch posts', e)
   } finally {
-    loading.value = false
+    if (showLoading) loading.value = false
   }
 }
+
+let pollInterval: any = null
+
+const checkPolling = () => {
+  const needsPolling = posts.value.some(p => p.status === 'draft' && !p.aiCaption && !p.editedCaption)
+  
+  if (needsPolling && !pollInterval) {
+    pollInterval = setInterval(() => {
+      fetchPosts(false)
+    }, 5000)
+  } else if (!needsPolling && pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
+
+onBeforeUnmount(() => {
+  if (pollInterval) clearInterval(pollInterval)
+})
 
 const formatDate = (dateString: string) => {
   return new Intl.DateTimeFormat('fr-FR', {
@@ -148,7 +175,7 @@ const viewPost = (post: any) => {
   navigateTo(`/dashboard/posts/${post.id}`)
 }
 
-watch([page, status], fetchPosts)
+watch([status], () => fetchPosts())
 
 onMounted(fetchPosts)
 </script>
@@ -285,6 +312,36 @@ onMounted(fetchPosts)
   -webkit-box-orient: vertical;
   overflow: hidden;
   line-height: 1.5;
+  min-height: 3em;
+}
+
+.caption-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem 0;
+  color: var(--accent-primary);
+  font-size: 0.8125rem;
+  min-height: 3em;
+}
+
+.spin {
+  animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.post-actions {
+  margin-top: 0.5rem;
+}
+
+.cta-btn {
+  width: 100%;
 }
 
 .post-meta {
@@ -330,6 +387,52 @@ onMounted(fetchPosts)
 @keyframes pulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 0.8; }
+}
+
+.account-selector-overlay {
+  position: fixed;
+  top: 100px;
+  left: 310px;
+  right: 30px;
+  bottom: 30px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2rem;
+  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.overlay-content {
+  text-align: center;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 3rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-glass);
+  border-radius: 2rem;
+}
+
+.overlay-icon {
+  width: 80px;
+  height: 80px;
+  background: var(--accent-gradient);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 1024px) {
+  .account-selector-overlay {
+    left: 30px;
+  }
 }
 
 .empty-state {

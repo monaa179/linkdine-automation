@@ -1,41 +1,28 @@
-import { prisma } from '../../utils/prisma'
 import { requireAuth } from '../../utils/auth'
+import { prisma } from '../../utils/prisma'
 
 export default defineEventHandler(async (event) => {
-    const auth = requireAuth(event)
-    const id = parseInt(getRouterParam(event, 'id') || '')
+    const user = requireAuth(event)
+    const id = parseInt(event.context.params?.id || '')
 
     if (isNaN(id)) {
-        throw createError({
-            statusCode: 400,
-            statusMessage: 'Invalid post ID'
-        })
+        throw createError({ statusCode: 400, statusMessage: 'Invalid ID' })
     }
 
-    // Verify ownership
+    // Ensure post belongs to user
     const post = await prisma.post.findFirst({
         where: {
-            id,
-            linkedinAccount: {
-                userId: auth.userId
-            }
+            id
         }
     })
 
     if (!post) {
-        throw createError({
-            statusCode: 404,
-            statusMessage: 'Post not found'
-        })
+        throw createError({ statusCode: 404, statusMessage: 'Post not found or access denied' })
     }
 
-    // Delete post
     await prisma.post.delete({
         where: { id }
     })
 
-    return {
-        success: true,
-        message: 'Post deleted successfully'
-    }
+    return { message: 'Post deleted' }
 })

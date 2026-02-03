@@ -31,7 +31,7 @@
             <div class="account-avatar">{{ account.name[0] }}</div>
             <div class="account-meta">
               <h3>{{ account.name }}</h3>
-              <span class="badge" :class="account.type.toLowerCase()">{{ account.type }}</span>
+              <span class="badge">{{ account.postingPeriod }}</span>
             </div>
             <div class="account-actions">
               <button class="icon-btn" title="Paramètres" @click="openSettings(account)">
@@ -45,46 +45,144 @@
 
           <div class="account-stats">
             <div class="stat-item">
-              <span class="stat-value">{{ account.postCount || 0 }}</span>
-              <span class="stat-label">Posts</span>
+              <span class="stat-value">{{ account.postingFrequency }}x</span>
+              <span class="stat-label">Fréquence</span>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
-              <span class="stat-value" :class="{ expired: account.isTokenExpired }">
-                {{ account.isTokenExpired ? 'Expiré' : 'Actif' }}
+              <span class="stat-value">
+                {{ account.postingHour }}
               </span>
-              <span class="stat-label">Statut Token</span>
+              <span class="stat-label">Heure</span>
             </div>
           </div>
           
           <template #footer>
             <div class="account-footer">
-              <span class="last-sync">Dernière synchro: {{ formatDate(account.createdAt) }}</span>
+              <BaseButton 
+                v-if="currentAccountId !== account.id"
+                variant="outline" 
+                size="sm" 
+                @click="selectAccount(account)"
+                block
+              >
+                Connecter ce compte
+              </BaseButton>
+              <div v-else class="selected-badge">
+                <CheckCircle2 :size="16" />
+                Connecté
+              </div>
             </div>
           </template>
         </BaseCard>
       </div>
+
+      <!-- Add Account Modal -->
+      <BaseModal v-if="showAddModal" title="Connecter un compte" @close="showAddModal = false">
+        <form @submit.prevent="handleAddAccount" class="account-form">
+          <BaseInput v-model="newAccount.name" label="Nom du compte" placeholder="ex: Mon Profile Perso" required />
+          <BaseInput v-model="newAccount.makeConnection" label="Make Connection ID" placeholder="ex: linkedin-connection-1" required />
+          <BaseTextArea v-model="newAccount.contextPrompt" label="Context Prompt (AI)" placeholder="Décrivez le ton et le style pour ce compte..." required />
+          
+          <div class="form-row">
+            <BaseSelect v-model="newAccount.postingPeriod" label="Période" :options="['day', 'week', 'month']" />
+            <BaseInput v-model.number="newAccount.postingFrequency" type="number" label="Fréquence" />
+          </div>
+
+          <div class="form-row">
+            <BaseInput v-model="newAccount.postingDay" label="Jour (ex: monday)" placeholder="monday" />
+            <BaseInput v-model="newAccount.postingHour" type="time" label="Heure" />
+          </div>
+
+          <div class="form-actions">
+            <BaseButton type="submit" variant="primary" block>Créer le compte</BaseButton>
+          </div>
+        </form>
+      </BaseModal>
+
+      <!-- Edit Account Modal -->
+      <BaseModal v-if="showEditModal" title="Paramètres du compte" @close="showEditModal = false">
+        <form v-if="editAccount" @submit.prevent="handleUpdateAccount" class="account-form">
+          <BaseInput v-model="editAccount.name" label="Nom du compte" required />
+          <BaseInput v-model="editAccount.makeConnection" label="Make Connection ID" required />
+          
+          <div class="base-textarea-container">
+            <label class="label">Context Prompt (AI)</label>
+            <div class="textarea-wrapper">
+              <textarea v-model="editAccount.contextPrompt" class="textarea" rows="4"></textarea>
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="base-select-container">
+              <label class="label">Période</label>
+              <select v-model="editAccount.postingPeriod" class="select">
+                <option value="day">Jour</option>
+                <option value="week">Semaine</option>
+                <option value="month">Mois</option>
+              </select>
+            </div>
+            <BaseInput v-model.number="editAccount.postingFrequency" type="number" label="Fréquence" />
+          </div>
+
+          <div class="form-row">
+            <BaseInput v-model="editAccount.postingDay" label="Jour" />
+            <BaseInput v-model="editAccount.postingHour" type="time" label="Heure" />
+          </div>
+
+          <div class="form-actions">
+            <BaseButton type="submit" variant="primary" block>Enregistrer</BaseButton>
+            <BaseButton 
+              type="button" 
+              variant="outline" 
+              block 
+              @click="generatePosts(editAccount)"
+              :loading="generating"
+            >
+              <Sparkles :size="18" />
+              Générer des publications
+            </BaseButton>
+          </div>
+        </form>
+      </BaseModal>
     </div>
   </NuxtLayout>
 </template>
 
 <script setup lang="ts">
-import { Link2, Trash2, Settings } from 'lucide-vue-next'
+import { Link2, Trash2, Settings, CheckCircle2, Sparkles } from 'lucide-vue-next'
 
 definePageMeta({
   layout: false,
   middleware: ['auth']
 })
 
+const { currentAccountId, setCurrentAccountId } = useCurrentAccount()
+const router = useRouter()
 const loading = ref(true)
 const connecting = ref(false)
-const accounts = ref([])
+const generating = ref(false)
+const accounts = ref<any[]>([])
+
+const showAddModal = ref(false)
+const showEditModal = ref(false)
+const editAccount = ref<any>(null)
+
+const newAccount = reactive({
+  name: '',
+  makeConnection: '',
+  contextPrompt: '',
+  postingFrequency: 1,
+  postingPeriod: 'week',
+  postingDay: 'monday',
+  postingHour: '09:00'
+})
 
 const fetchAccounts = async () => {
   loading.value = true
   try {
-    const data = await $fetch('/api/linkedin/accounts')
-    accounts.value = data.accounts
+    const data = await $fetch<any[]>('/api/accounts')
+    accounts.value = data
   } catch (e) {
     console.error('Failed to fetch accounts', e)
   } finally {
@@ -92,25 +190,94 @@ const fetchAccounts = async () => {
   }
 }
 
+const handleAddAccount = async () => {
+  try {
+    await $fetch('/api/accounts', {
+      method: 'POST',
+      body: newAccount
+    })
+    showAddModal.value = false
+    // Reset form
+    Object.assign(newAccount, {
+      name: '',
+      makeConnection: '',
+      contextPrompt: '',
+      postingFrequency: 1,
+      postingPeriod: 'week',
+      postingDay: 'monday',
+      postingHour: '09:00'
+    })
+    await fetchAccounts()
+  } catch (e) {
+    alert('Erreur lors de l\'ajout du compte')
+  }
+}
+
+const handleUpdateAccount = async () => {
+  if (!editAccount.value) return
+  try {
+    await $fetch(`/api/accounts/${editAccount.value.id}`, {
+      method: 'PATCH',
+      body: editAccount.value
+    })
+    showEditModal.value = false
+    await fetchAccounts()
+  } catch (e) {
+    alert('Erreur lors de la mise à jour')
+  }
+}
+
 const connectNewAccount = () => {
-  connecting.value = true
-  // Redirect to the LinkedIn connect endpoint
-  window.location.href = '/api/linkedin/connect'
+  showAddModal.value = true
 }
 
 const openSettings = (account: any) => {
-  // Logic to open settings modal/page
-  navigateTo(`/dashboard/settings/${account.id}`)
+  editAccount.value = { ...account }
+  showEditModal.value = true
 }
 
 const confirmDelete = async (account: any) => {
   if (confirm(`Êtes-vous sûr de vouloir supprimer le compte "${account.name}" ?`)) {
     try {
-      await $fetch(`/api/linkedin/accounts/${account.id}`, { method: 'DELETE' })
+      await $fetch(`/api/accounts/${account.id}`, { method: 'DELETE' })
+      if (currentAccountId.value === account.id) {
+        setCurrentAccountId(null)
+      }
       await fetchAccounts()
     } catch (e) {
       alert('Erreur lors de la suppression')
     }
+  }
+}
+
+const selectAccount = (account: any) => {
+  setCurrentAccountId(account.id)
+  router.push('/dashboard')
+}
+
+const generatePosts = async (account: any) => {
+  if (!confirm(`Voulez-vous lancer la génération de publications pour "${account.name}" ?`)) return
+  
+  generating.value = true
+  try {
+    // 1. Enregistrer les modifications d'abord pour s'assurer que Make.com reçoit le dernier contextPrompt
+    await $fetch(`/api/accounts/${account.id}`, {
+      method: 'PATCH',
+      body: account
+    })
+
+    // 2. Lancer la génération
+    const response = await $fetch(`/api/accounts/${account.id}/generate`, {
+      method: 'POST'
+    })
+    alert('Génération lancée avec succès ! Consultez la liste des posts dans quelques instants.')
+    if (showEditModal.value) showEditModal.value = false
+    await fetchAccounts() // Refresh to show any changes
+  } catch (e: any) {
+    console.error('Generation failed', e)
+    alert(`Erreur lors de la génération: ${e.message || 'Erreur inconnue'}`)
+  } finally {
+    generating.value = false
   }
 }
 
@@ -265,8 +432,20 @@ onMounted(fetchAccounts)
 }
 
 .account-footer {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
+  width: 100%;
+}
+
+.selected-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--accent-primary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.5rem;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 8px;
 }
 
 .empty-state {

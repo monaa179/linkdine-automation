@@ -1,60 +1,55 @@
-import { prisma } from '../../utils/prisma'
 import { requireWebhookAuth } from '../../utils/webhook'
+import { prisma } from '../../utils/prisma'
 
 export default defineEventHandler(async (event) => {
     requireWebhookAuth(event)
 
     const body = await readBody(event)
+    console.log('Webhook Received Body:', body)
+    const { postId, aiCaption } = body
 
-    // Validation
-    if (!body.postId || !body.aiCaption) {
+    if (!postId || !aiCaption) {
         throw createError({
             statusCode: 400,
             statusMessage: 'postId and aiCaption are required'
         })
     }
 
-    const postId = parseInt(body.postId)
-    if (isNaN(postId)) {
+    const idStr = String(postId)
+    const id = parseInt(idStr)
+
+    console.log('Webhook Debug - Original postId:', postId, 'Type:', typeof postId)
+    console.log('Webhook Debug - Parsed ID:', id)
+
+    if (isNaN(id)) {
         throw createError({
             statusCode: 400,
-            statusMessage: 'Invalid postId'
+            statusMessage: 'Invalid postId format'
         })
     }
 
-    // Find the post
     const post = await prisma.post.findUnique({
-        where: { id: postId }
+        where: { id }
     })
 
     if (!post) {
         throw createError({
             statusCode: 404,
-            statusMessage: 'Post not found'
+            statusMessage: `Post with ID ${id} not found`
         })
     }
 
-    // Update post with AI caption
-    const updated = await prisma.post.update({
-        where: { id: postId },
-        data: {
-            aiCaption: body.aiCaption,
-            status: body.scheduleNow ? 'scheduled' : 'draft',
-            scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null
-        },
-        include: {
-            linkedinAccount: {
-                select: {
-                    id: true,
-                    name: true,
-                    type: true
-                }
-            }
-        }
-    })
-
-    return {
-        success: true,
-        post: updated
+    try {
+        const updatedPost = await prisma.post.update({
+            where: { id },
+            data: { aiCaption }
+        })
+        return updatedPost
+    } catch (error: any) {
+        throw createError({
+            statusCode: 500,
+            statusMessage: 'Failed to update post',
+            data: error.message
+        })
     }
 })

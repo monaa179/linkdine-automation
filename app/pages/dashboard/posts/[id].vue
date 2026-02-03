@@ -34,7 +34,7 @@
               <div class="info-section">
                 <div class="info-item">
                   <User :size="16" />
-                  <span>Compte: <strong>{{ post.linkedinAccount?.name }}</strong></span>
+                  <span>Compte: <strong>{{ post.account?.name }}</strong></span>
                 </div>
                 <div class="info-item">
                   <Calendar :size="16" />
@@ -46,27 +46,51 @@
               <div class="section-divider"></div>
               
               <div class="caption-editor">
-                <label>Légende (Générée par l'IA)</label>
-                <div v-if="!post.aiCaption" class="ai-generating glass">
-                  <div class="pulse-line"></div>
+                <label>Légende</label>
+                <div v-if="!post.aiCaption && !post.editedCaption" class="ai-generating glass">
+                  <RefreshCw :size="32" class="spin" />
                   <p>L'IA génère votre légende... Elle apparaîtra ici automatiquement.</p>
                 </div>
-                <textarea 
-                  v-else
-                  v-model="editedCaption"
-                  class="custom-textarea"
-                  rows="10"
-                  placeholder="La légende apparaîtra ici..."
-                ></textarea>
-                <p class="hint">Modifiez la légende générée ci-dessus pour la personnaliser avant publication.</p>
+                <div v-else>
+                   <textarea 
+                    v-model="editedCaption"
+                    class="custom-textarea"
+                    rows="10"
+                    placeholder="La légende apparaîtra ici..."
+                  ></textarea>
+                  <p class="hint">Modifiez la légende générée ci-dessus pour la personnaliser avant publication.</p>
+                </div>
+              </div>
+
+              <!-- Scheduling Section -->
+              <div v-if="post.status === 'draft' || post.status === 'scheduled'" class="scheduling-section">
+                <div class="section-divider"></div>
+                <div class="form-group">
+                  <label>Date et heure de publication</label>
+                  <input 
+                    type="datetime-local" 
+                    v-model="scheduledAt" 
+                    class="custom-input"
+                    :min="minDateTime"
+                  />
+                  <p class="hint">Sélectionnez le moment où vous souhaitez que ce post soit publié.</p>
+                </div>
               </div>
 
               <div class="form-actions">
-                <BaseButton @click="handleSave" :loading="saving" :disabled="!post.aiCaption">
+                <BaseButton @click="handleSave" :loading="saving" :disabled="!post.aiCaption && !post.editedCaption">
+                  <Save :size="16" />
                   Enregistrer les modifications
                 </BaseButton>
-                <BaseButton variant="outline" v-if="post.status === 'DRAFT'" @click="handleSchedule" :loading="scheduling">
-                  Programmer pour publication
+                <BaseButton 
+                  variant="outline" 
+                  v-if="post.status === 'draft'" 
+                  @click="handleSchedule" 
+                  :loading="scheduling"
+                  :disabled="!scheduledAt || (!post.aiCaption && !post.editedCaption)"
+                >
+                  <Calendar :size="16" />
+                  Programmer
                 </BaseButton>
               </div>
             </div>
@@ -78,9 +102,9 @@
            <h3 class="preview-title">Aperçu Final</h3>
            <div class="linkedin-preview glass">
               <div class="preview-header">
-                <div class="preview-avatar">{{ post.linkedinAccount?.name[0] }}</div>
+                <div class="preview-avatar">{{ post.account?.name[0] }}</div>
                 <div class="preview-user-meta">
-                  <div class="preview-name">{{ post.linkedinAccount?.name }}</div>
+                  <div class="preview-name">{{ post.account?.name }}</div>
                   <div class="preview-sub">LinkedIn Automation • Maintenant</div>
                 </div>
               </div>
@@ -112,7 +136,9 @@ import {
   Calendar, 
   ThumbsUp, 
   MessageSquare, 
-  Share2 
+  Share2,
+  RefreshCw,
+  Save
 } from 'lucide-vue-next'
 
 definePageMeta({
@@ -127,12 +153,21 @@ const saving = ref(false)
 const scheduling = ref(false)
 const deleting = ref(false)
 const editedCaption = ref('')
+const scheduledAt = ref('')
+
+const minDateTime = computed(() => {
+  const now = new Date()
+  return now.toISOString().slice(0, 16)
+})
 
 const fetchPost = async () => {
   try {
-    const data = await $fetch(`/api/posts/${route.params.id}`)
-    post.value = data.post
-    editedCaption.value = data.post.editedCaption || data.post.aiCaption || ''
+    const data = await $fetch<any>(`/api/posts/${route.params.id}`)
+    post.value = data
+    editedCaption.value = data.editedCaption || data.aiCaption || ''
+    if (data.scheduledAt) {
+      scheduledAt.value = new Date(data.scheduledAt).toISOString().slice(0, 16)
+    }
   } catch (e) {
     console.error('Failed to fetch post', e)
     navigateTo('/dashboard/posts')
@@ -146,7 +181,10 @@ const handleSave = async () => {
   try {
     await $fetch(`/api/posts/${post.value.id}`, {
       method: 'PATCH',
-      body: { editedCaption: editedCaption.value }
+      body: { 
+        editedCaption: editedCaption.value,
+        scheduledAt: scheduledAt.value ? new Date(scheduledAt.value).toISOString() : null
+      }
     })
     alert('Modification enregistrée !')
   } catch (e) {
@@ -157,11 +195,20 @@ const handleSave = async () => {
 }
 
 const handleSchedule = async () => {
+  if (!scheduledAt.value) {
+    alert('Veuillez sélectionner une date et heure.')
+    return
+  }
+
   scheduling.value = true
   try {
     await $fetch(`/api/posts/${post.value.id}`, {
       method: 'PATCH',
-      body: { status: 'SCHEDULED' }
+      body: { 
+        status: 'scheduled',
+        scheduledAt: new Date(scheduledAt.value).toISOString(),
+        editedCaption: editedCaption.value
+      }
     })
     await fetchPost()
     alert('Post programmé !')
@@ -304,24 +351,47 @@ onMounted(fetchPost)
   gap: 1rem;
 }
 
-.pulse-line {
-  height: 4px;
-  background: var(--accent-gradient);
-  border-radius: 2px;
-  animation: pulse 2s infinite;
+.spin {
+  animation: rotate 2s linear infinite;
 }
 
-.custom-textarea {
-  background: rgba(255, 255, 255, 0.03);
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.scheduling-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.form-group label {
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.custom-input {
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-glass);
   border-radius: 0.75rem;
-  padding: 1.25rem;
+  padding: 0.75rem 1rem;
   color: var(--text-primary);
   font-family: inherit;
   font-size: 1rem;
-  line-height: 1.6;
   outline: none;
-  resize: vertical;
+  transition: all var(--transition-fast);
+}
+
+.custom-input:focus {
+  border-color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .hint {

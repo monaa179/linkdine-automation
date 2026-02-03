@@ -14,17 +14,13 @@ export default defineEventHandler(async (event) => {
 
     const post = await prisma.post.findFirst({
         where: {
-            id,
-            linkedinAccount: {
-                userId: auth.userId
-            }
+            id
         },
         include: {
-            linkedinAccount: {
+            account: {
                 select: {
                     id: true,
-                    name: true,
-                    type: true
+                    name: true
                 }
             }
         }
@@ -37,5 +33,5 @@ export default defineEventHandler(async (event) => {
         })
     }
 
-    return { post }
+    return post
 })

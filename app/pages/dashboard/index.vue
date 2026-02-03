@@ -1,9 +1,24 @@
 <template>
   <NuxtLayout name="dashboard">
     <div class="dashboard-page">
-      <div class="welcome-section">
-        <h1 class="title">Tableau de bord</h1>
-        <p class="subtitle">Bienvenue, {{ user?.email.split('@')[0] }}. Voici un aperçu de votre activité.</p>
+      <ClientOnly>
+        <div class="welcome-section">
+          <h1 class="title">Tableau de bord</h1>
+          <p v-if="currentAccount" class="subtitle">Bienvenue sur le compte <strong>{{ currentAccount.name }}</strong>.</p>
+          <p v-else class="subtitle">Bienvenue, {{ user?.email.split('@')[0] }}. Veuillez sélectionner un compte pour commencer.</p>
+        </div>
+      </ClientOnly>
+
+      <!-- No Account Selected Overlay -->
+      <div v-if="!currentAccountId && !loading" class="account-selector-overlay glass-heavy animate-fade-in">
+        <div class="overlay-content">
+          <div class="overlay-icon"><Link2 :size="48" /></div>
+          <h2>Aucun compte sélectionné</h2>
+          <p>Vous devez sélectionner un compte LinkedIn pour voir les statistiques et gérer les publications.</p>
+          <NuxtLink to="/dashboard/accounts">
+            <BaseButton variant="primary" size="lg">Sélectionner un compte</BaseButton>
+          </NuxtLink>
+        </div>
       </div>
 
       <!-- Stats Grid -->
@@ -63,7 +78,7 @@
               <div class="account-avatar">{{ account.name[0] }}</div>
               <div class="account-info">
                 <span class="account-name">{{ account.name }}</span>
-                <span class="account-type">{{ account.type }}</span>
+                <span class="account-type">{{ account.postingPeriod }}</span>
               </div>
             </div>
           </div>
@@ -80,7 +95,8 @@ import {
   FileEdit, 
   Clock, 
   FileText,
-  Link2
+  Link2,
+  AlertCircle
 } from 'lucide-vue-next'
 
 definePageMeta({
@@ -89,9 +105,10 @@ definePageMeta({
 })
 
 const { user } = useAuth()
+const { currentAccountId, currentAccount, fetchCurrentAccount } = useCurrentAccount()
 const loading = ref(true)
-const posts = ref([])
-const accounts = ref([])
+const posts = ref<any[]>([])
+const accounts = ref<any[]>([])
 
 const stats = computed(() => [
   { label: 'Programmés', value: 0, icon: Clock, color: '#3b82f6' },
@@ -102,12 +119,17 @@ const stats = computed(() => [
 
 onMounted(async () => {
   try {
-    const [postsData, accountsData] = await Promise.all([
-      $fetch('/api/posts?limit=5'),
-      $fetch('/api/linkedin/accounts')
-    ])
-    posts.value = postsData.posts
-    accounts.value = accountsData.accounts
+    if (currentAccountId.value) {
+      const [postsData, accountsData, _] = await Promise.all([
+        $fetch<any[]>(`/api/posts?accountId=${currentAccountId.value}&limit=5`),
+        $fetch<any[]>('/api/accounts'), // Fetch all accounts to show in mini-list
+        fetchCurrentAccount()
+      ])
+      posts.value = postsData
+      accounts.value = accountsData
+    } else {
+      loading.value = false
+    }
   } catch (e) {
     console.error('Failed to fetch dashboard data', e)
   } finally {
@@ -263,6 +285,52 @@ onMounted(async () => {
   border-top-color: var(--accent-primary);
   border-radius: 50%;
   animation: spin 1s infinite linear;
+}
+
+.account-selector-overlay {
+  position: fixed;
+  top: 100px;
+  left: 310px; /* Sidebar width + some padding */
+  right: 30px;
+  bottom: 30px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2rem;
+  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.overlay-content {
+  text-align: center;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 3rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-glass);
+  border-radius: 2rem;
+}
+
+.overlay-icon {
+  width: 80px;
+  height: 80px;
+  background: var(--accent-gradient);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 1024px) {
+  .account-selector-overlay {
+    left: 30px;
+  }
 }
 
 @keyframes spin {

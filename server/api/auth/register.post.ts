@@ -1,34 +1,14 @@
-import { prisma } from '../../utils/prisma'
 import { hashPassword, generateToken } from '../../utils/auth'
+import { prisma } from '../../utils/prisma'
 
 export default defineEventHandler(async (event) => {
     const body = await readBody(event)
+    const { email, password } = body
 
-    // Validation
-    if (!body.email || !body.password) {
+    if (!email || !password) {
         throw createError({
             statusCode: 400,
             statusMessage: 'Email and password are required'
-        })
-    }
-
-    const email = body.email.toLowerCase().trim()
-    const password = body.password
-
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-        throw createError({
-            statusCode: 400,
-            statusMessage: 'Invalid email format'
-        })
-    }
-
-    // Password strength validation
-    if (password.length < 8) {
-        throw createError({
-            statusCode: 400,
-            statusMessage: 'Password must be at least 8 characters'
         })
     }
 
@@ -40,7 +20,7 @@ export default defineEventHandler(async (event) => {
     if (existingUser) {
         throw createError({
             statusCode: 409,
-            statusMessage: 'Email already registered'
+            statusMessage: 'User already exists'
         })
     }
 
@@ -50,15 +30,9 @@ export default defineEventHandler(async (event) => {
         data: {
             email,
             passwordHash
-        },
-        select: {
-            id: true,
-            email: true,
-            createdAt: true
         }
     })
 
-    // Generate token
     const token = generateToken({ userId: user.id, email: user.email })
 
     // Set cookie
@@ -70,7 +44,7 @@ export default defineEventHandler(async (event) => {
     })
 
     return {
-        user,
-        token
+        id: user.id,
+        email: user.email
     }
 })

@@ -11,8 +11,8 @@ export const useAuth = () => {
     const fetchUser = async () => {
         loading.value = true
         try {
-            const data = await $fetch<{ user: User }>('/api/auth/me')
-            user.value = data.user
+            const data = await $fetch<User>('/api/auth/me')
+            user.value = data
         } catch (error) {
             user.value = null
         } finally {
@@ -22,11 +22,11 @@ export const useAuth = () => {
 
     const login = async (credentials: { email: string; password: string }) => {
         try {
-            const data = await $fetch<{ user: User }>('/api/auth/login', {
+            const data = await $fetch<User>('/api/auth/login', {
                 method: 'POST',
                 body: credentials
             })
-            user.value = data.user
+            user.value = data
             return { success: true }
         } catch (error: any) {
             return {
@@ -53,7 +53,9 @@ export const useAuth = () => {
 
     const logout = async () => {
         try {
+            const { setCurrentAccountId } = useCurrentAccount()
             await $fetch('/api/auth/logout', { method: 'POST' })
+            setCurrentAccountId(null)
             user.value = null
             navigateTo('/auth/login')
         } catch (error) {
