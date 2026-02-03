@@ -1,0 +1,439 @@
+<template>
+  <NuxtLayout name="dashboard">
+    <div class="gallery-page">
+      <div class="page-header">
+        <NuxtLink to="/dashboard/accounts" class="back-link">
+          <ChevronLeft :size="20" />
+          Retour aux comptes
+        </NuxtLink>
+        <h1 class="title">Galerie : {{ account?.name }}</h1>
+        <p class="subtitle">Uploadez vos photos ici. Cliquez sur "Rédiger les captions" pour générer les textes via l'IA.</p>
+      </div>
+
+      <!-- Upload Section -->
+      <div class="upload-section">
+        <BaseCard>
+          <div 
+            class="dropzone" 
+            :class="{ dragover, hasImages: selectedFiles.length > 0 }"
+            @dragover.prevent="dragover = true"
+            @dragleave.prevent="dragover = false"
+            @drop.prevent="handleDrop"
+            @click="fileInput?.click()"
+          >
+            <input 
+              type="file" 
+              ref="fileInput" 
+              class="hidden" 
+              accept="image/*" 
+              multiple
+              @change="handleFileSelect" 
+            />
+            
+            <div class="dropzone-content">
+              <Upload :size="32" />
+              <p>Cliquez ou glissez vos images pour les ajouter à la galerie</p>
+              <span class="sub-hint">JPG, PNG, WebP (max 10MB par image)</span>
+            </div>
+          </div>
+
+          <!-- Selected Files Preview & Upload Button -->
+          <div v-if="selectedFiles.length > 0" class="upload-actions animate-fade-in">
+            <div class="files-preview-grid">
+              <div v-for="(file, index) in selectedFiles" :key="index" class="file-preview-item">
+                <div class="preview-mini-container">
+                  <img :src="file.preview" alt="Preview" class="mini-preview" />
+                  <button type="button" class="remove-file-btn" @click.stop="removeFile(index)">
+                    <X :size="14" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="actions-row">
+              <BaseButton 
+                @click="uploadImages" 
+                :loading="uploading" 
+                size="lg"
+                class="upload-btn"
+              >
+                Uploader {{ selectedFiles.length }} images
+              </BaseButton>
+            </div>
+          </div>
+        </BaseCard>
+      </div>
+
+      <!-- Gallery Grid -->
+      <div class="gallery-section">
+        <div class="section-header">
+          <h2>Images en attente ({{ galleryPosts.length }})</h2>
+          <BaseButton 
+            v-if="galleryPosts.length > 0"
+            variant="primary" 
+            @click="triggerCaptionGeneration"
+            :loading="generating"
+          >
+            <Sparkles :size="18" />
+            Rédiger les captions
+          </BaseButton>
+        </div>
+
+        <div v-if="loading" class="loading-grid">
+          <div v-for="i in 4" :key="i" class="skeleton-card glass"></div>
+        </div>
+
+        <div v-else-if="galleryPosts.length === 0" class="empty-gallery glass">
+          <Image :size="48" />
+          <p>Votre galerie est vide. Uploadez des photos pour commencer.</p>
+        </div>
+
+        <div v-else class="gallery-grid">
+          <div v-for="post in galleryPosts" :key="post.id" class="gallery-item glass">
+            <img :src="post.imageUrl" alt="Gallery image" class="gallery-img" />
+            <div class="item-overlay">
+              <button class="delete-btn" @click="deletePost(post.id)">
+                <Trash2 :size="18" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </NuxtLayout>
+</template>
+
+<script setup lang="ts">
+import { 
+  ChevronLeft, 
+  Upload, 
+  X, 
+  Sparkles, 
+  Image, 
+  Trash2 
+} from 'lucide-vue-next'
+
+definePageMeta({
+  layout: false,
+  middleware: ['auth']
+})
+
+const route = useRoute()
+const accountId = parseInt(route.params.accountId as string)
+
+const account = ref<any>(null)
+const galleryPosts = ref<any[]>([])
+const loading = ref(true)
+const uploading = ref(false)
+const generating = ref(false)
+const dragover = ref(false)
+const selectedFiles = ref<any[]>([])
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const fetchAccountData = async () => {
+  loading.value = true
+  try {
+    account.value = await $fetch(`/api/accounts/${accountId}`)
+    const allPosts = await $fetch<any[]>(`/api/posts?accountId=${accountId}`)
+    // Gallery = posts without AI caption
+    galleryPosts.value = allPosts.filter(p => !p.aiCaption && !p.editedCaption)
+  } catch (e) {
+    console.error('Failed to fetch account data', e)
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleFileSelect = (e: Event) => {
+  const files = (e.target as HTMLInputElement).files
+  if (files) addFiles(Array.from(files))
+}
+
+const handleDrop = (e: DragEvent) => {
+  dragover.value = false
+  const files = e.dataTransfer?.files
+  if (files) addFiles(Array.from(files))
+}
+
+const addFiles = (files: File[]) => {
+  const imageFiles = files.filter(f => f.type.startsWith('image/'))
+  imageFiles.forEach(file => {
+    selectedFiles.value.push({
+      file,
+      name: file.name,
+      preview: URL.createObjectURL(file)
+    })
+  })
+}
+
+const removeFile = (index: number) => {
+  const removed = selectedFiles.value.splice(index, 1)[0]
+  if (removed.preview) URL.revokeObjectURL(removed.preview)
+}
+
+const uploadImages = async () => {
+  if (selectedFiles.value.length === 0) return
+  
+  uploading.value = true
+  const formData = new FormData()
+  formData.append('accountId', String(accountId))
+  selectedFiles.value.forEach(f => formData.append('images', f.file))
+
+  try {
+    await $fetch('/api/posts/bulk-upload', {
+      method: 'POST',
+      body: formData
+    })
+    selectedFiles.value = []
+    await fetchAccountData()
+  } catch (e) {
+    alert('Erreur lors de l\'upload des images.')
+  } finally {
+    uploading.value = false
+  }
+}
+
+const triggerCaptionGeneration = async () => {
+  if (!confirm('Voulez-vous lancer la rédaction des captions pour toutes les images de la galerie ?')) return
+  
+  generating.value = true
+  try {
+    const res = await $fetch(`/api/accounts/${accountId}/generate-captions`, {
+      method: 'POST'
+    })
+    alert('Rédaction lancée avec succès ! Les images apparaîtront dans le Feed une fois terminées.')
+    await fetchAccountData()
+  } catch (e) {
+    alert('Erreur lors du lancement de la génération.')
+  } finally {
+    generating.value = false
+  }
+}
+
+const deletePost = async (id: number) => {
+  if (!confirm('Supprimer cette image de la galerie ?')) return
+  try {
+    await $fetch(`/api/posts/${id}`, { method: 'DELETE' })
+    await fetchAccountData()
+  } catch (e) {
+    alert('Erreur lors de la suppression.')
+  }
+}
+
+onMounted(fetchAccountData)
+</script>
+
+<style scoped>
+.gallery-page {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.back-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  transition: color var(--transition-fast);
+}
+
+.back-link:hover {
+  color: var(--accent-primary);
+}
+
+.title {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+}
+
+.dropzone {
+  border: 2px dashed var(--border-glass);
+  border-radius: 1rem;
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+
+.dropzone:hover, .dropzone.dragover {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.03);
+}
+
+.dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.sub-hint {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.upload-actions {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.files-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 1rem;
+}
+
+.preview-mini-container {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--border-glass);
+}
+
+.mini-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-file-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.remove-file-btn:hover {
+  background: #ef4444;
+}
+
+.actions-row {
+  display: flex;
+  justify-content: center;
+}
+
+.upload-btn {
+  min-width: 250px;
+}
+
+.gallery-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.gallery-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 1rem;
+  overflow: hidden;
+  padding: 0 !important;
+}
+
+.gallery-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.item-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 0.75rem;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.gallery-item:hover .item-overlay {
+  opacity: 1;
+}
+
+.delete-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.8);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.delete-btn:hover {
+  transform: scale(1.1);
+}
+
+.empty-gallery {
+  padding: 4rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: var(--text-secondary);
+}
+
+.loading-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.skeleton-card {
+  height: 200px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
+.hidden { display: none; }
+</style>

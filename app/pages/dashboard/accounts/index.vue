@@ -57,6 +57,17 @@
             </div>
           </div>
           
+          <div class="account-nav">
+            <NuxtLink :to="`/dashboard/accounts/${account.id}/gallery`" class="nav-btn gallery">
+              <Image :size="18" />
+              <span>Galerie</span>
+            </NuxtLink>
+            <NuxtLink :to="`/dashboard/accounts/${account.id}/feed`" class="nav-btn feed">
+              <LayoutPanelLeft :size="18" />
+              <span>Feed</span>
+            </NuxtLink>
+          </div>
+          
           <template #footer>
             <div class="account-footer">
               <BaseButton 
@@ -150,7 +161,7 @@
 </template>
 
 <script setup lang="ts">
-import { Link2, Trash2, Settings, CheckCircle2, Sparkles } from 'lucide-vue-next'
+import { Link2, Trash2, Settings, CheckCircle2, Sparkles, Image, LayoutPanelLeft } from 'lucide-vue-next'
 
 definePageMeta({
   layout: false,
@@ -430,6 +441,37 @@ onMounted(fetchAccounts)
   height: 30px;
   background: var(--border-glass);
 }
+
+.account-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-glass);
+  color: var(--text-primary);
+}
+
+.nav-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
+}
+
+.nav-btn.gallery { color: var(--accent-secondary); }
+.nav-btn.feed { color: var(--accent-primary); }
 
 .account-footer {
   width: 100%;

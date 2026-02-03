@@ -66,20 +66,6 @@ export default defineEventHandler(async (event) => {
         })
 
         createdPosts.push(post)
-
-        // Trigger Make.com for AI generation
-        const makeWebhookUrl = process.env.MAKE_GENERATE_CAPTION_WEBHOOK_URL
-        if (makeWebhookUrl) {
-            // We trigger it asynchronously and don't wait for the result
-            $fetch(makeWebhookUrl, {
-                method: 'POST',
-                body: {
-                    postId: post.id,
-                    imageUrl: `${(process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '')}${imageUrl}`,
-                    contextPrompt: account.contextPrompt
-                }
-            }).catch(err => console.error(`Error triggering Make webhook for post ${post.id}:`, err))
-        }
     }
 
     return createdPosts
