@@ -158,6 +158,16 @@
             <BaseInput v-model="editAccount.postingHour" type="time" label="Heure" />
           </div>
 
+          <div v-if="previewSlots.length > 0" class="preview-section">
+            <label class="label">Prochaines publications prévues :</label>
+            <div class="slots-list">
+              <div v-for="(slot, i) in previewSlots" :key="i" class="slot-item">
+                <Calendar :size="14" />
+                <span>{{ slot.formatted }}</span>
+              </div>
+            </div>
+          </div>
+
           <div class="form-actions">
             <BaseButton type="submit" variant="primary" block>Enregistrer</BaseButton>
             <BaseButton 
@@ -178,7 +188,7 @@
 </template>
 
 <script setup lang="ts">
-import { Link2, Trash2, Settings, CheckCircle2, Sparkles, Image, LayoutPanelLeft } from 'lucide-vue-next'
+import { Link2, Trash2, Settings, CheckCircle2, Sparkles, Image, LayoutPanelLeft, Calendar } from 'lucide-vue-next'
 import BaseCheckboxGroup from '~/components/BaseCheckboxGroup.vue'
 
 definePageMeta({
@@ -198,6 +208,7 @@ const dayOptions = [
 
 const selectedDaysNew = ref<string[]>(['monday'])
 const selectedDaysEdit = ref<string[]>(['monday'])
+const previewSlots = ref<any[]>([])
 
 const { currentAccountId, setCurrentAccountId } = useCurrentAccount()
 const router = useRouter()
@@ -209,6 +220,28 @@ const accounts = ref<any[]>([])
 const showAddModal = ref(false)
 const showEditModal = ref(false)
 const editAccount = ref<any>(null)
+
+// Preview logic
+const updatePreview = async () => {
+  if (!editAccount.value) return
+  try {
+    const data = await $fetch<any>('/api/accounts/preview-slots', {
+      method: 'POST',
+      body: {
+        postingPeriod: editAccount.value.postingPeriod,
+        postingFrequency: editAccount.value.postingFrequency,
+        postingDay: editAccount.value.postingPeriod === 'week' ? selectedDaysEdit.value.join(',') : editAccount.value.postingDay,
+        postingHour: editAccount.value.postingHour
+      }
+    })
+    previewSlots.value = data.slots
+  } catch (e) {
+    console.error('Failed to fetch preview', e)
+  }
+}
+
+watch([() => editAccount.value?.postingPeriod, () => editAccount.value?.postingFrequency, () => editAccount.value?.postingHour, selectedDaysEdit, () => editAccount.value?.postingDay], updatePreview, { deep: true })
+
 
 const newAccount = reactive({
   name: '',
@@ -293,6 +326,10 @@ const openSettings = (account: any) => {
     selectedDaysEdit.value = []
   }
   showEditModal.value = true
+  // Trigger preview
+  nextTick(() => {
+    updatePreview()
+  })
 }
 
 const confirmDelete = async (account: any) => {
@@ -608,6 +645,46 @@ onMounted(fetchAccounts)
   font-size: 0.8125rem;
   color: var(--text-secondary);
   line-height: 1.4;
+}
+
+/* Preview Section */
+.preview-section {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+.preview-section .label {
+  display: block;
+  margin-bottom: 0.75rem;
+  color: var(--accent-primary);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.slots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.slot-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0.5rem;
+}
+
+.slot-item span {
+  text-transform: capitalize;
 }
 
 .form-section {

@@ -1,5 +1,6 @@
 import { requireWebhookAuth } from '../../utils/webhook'
 import { prisma } from '../../utils/prisma'
+import { getNextAvailableSlots } from '../../utils/scheduler'
 
 export default defineEventHandler(async (event) => {
     requireWebhookAuth(event)
@@ -40,9 +41,16 @@ export default defineEventHandler(async (event) => {
     }
 
     try {
+        const slots = await getNextAvailableSlots(post.accountId, 1)
+        const scheduledAt = slots[0]
+
         const updatedPost = await prisma.post.update({
             where: { id },
-            data: { aiCaption }
+            data: {
+                aiCaption,
+                status: 'scheduled',
+                scheduledAt
+            }
         })
         return updatedPost
     } catch (error: any) {

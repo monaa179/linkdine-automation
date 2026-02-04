@@ -29,7 +29,10 @@
           </div>
           <div class="feed-editor">
             <div class="editor-header">
-              <span class="date">{{ formatDate(post.createdAt) }}</span>
+              <div class="date-badge" :class="{ scheduled: post.scheduledAt, warning: !post.scheduledAt }">
+                <Calendar :size="14" />
+                <span>{{ post.scheduledAt ? 'Prévu le ' + formatDate(post.scheduledAt) : 'Non planifié' }}</span>
+              </div>
               <div class="item-actions">
                  <button class="delete-icon" @click="deletePost(post.id)">
                   <Trash2 :size="16" />
@@ -68,7 +71,8 @@ import {
   LayoutPanelLeft, 
   Trash2, 
   Save, 
-  CheckCircle2 
+  CheckCircle2,
+  Calendar
 } from 'lucide-vue-next'
 
 definePageMeta({
@@ -214,9 +218,31 @@ onMounted(fetchAccountData)
   align-items: center;
 }
 
-.date {
-  font-size: 0.875rem;
+.date-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);
+}
+
+.date-badge.scheduled {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-primary);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.date-badge.warning {
+  background: rgba(234, 179, 8, 0.1);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.2);
+}
+
+.date-badge span {
+  font-weight: 500;
 }
 
 .item-actions {
