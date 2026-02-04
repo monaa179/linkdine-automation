@@ -1,5 +1,6 @@
 import { requireAuth } from '../../../utils/auth'
 import { prisma } from '../../../utils/prisma'
+import { triggerMakeWebhook } from '../../../utils/make'
 
 export default defineEventHandler(async (event) => {
     const user = requireAuth(event)
@@ -30,25 +31,15 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 500, statusMessage: 'Make.com webhook URL not configured' })
     }
 
-    console.log(`[Webhook Trigger] Sending to Make: ${makeWebhookUrl}`)
     const payload = {
         accountId: account.id,
         accountName: account.name,
         contextPrompt: account.contextPrompt,
         imageCount: postsToProcess.length
     }
-    console.log(`[Webhook Trigger] Payload:`, payload)
 
-    // Trigger webhook ONCE for the whole account/gallery
-    try {
-        await $fetch(makeWebhookUrl, {
-            method: 'POST',
-            body: payload
-        })
-    } catch (err: any) {
-        console.error('[Webhook Trigger] Error:', err.message)
-        throw createError({ statusCode: 500, statusMessage: `Erreur webhook Make: ${err.message}` })
-    }
+    // Trigger webhook ONCE for the whole account/gallery via utility
+    await triggerMakeWebhook(makeWebhookUrl, payload)
 
     return {
         message: `Triggered caption generation for ${postsToProcess.length} images.`,
