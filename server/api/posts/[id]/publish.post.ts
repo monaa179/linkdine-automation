@@ -1,5 +1,6 @@
 import { requireAuth } from '../../../utils/auth'
 import { prisma } from '../../../utils/prisma'
+import { triggerMakeWebhook } from '../../../utils/make'
 
 export default defineEventHandler(async (event) => {
     const user = requireAuth(event)
@@ -19,37 +20,33 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 404, statusMessage: 'Post not found' })
     }
 
-    // 2. Trigger Make.com webhook
+    // 2. Trigger Make.com webhook via utility
     const makePublishWebhookUrl = process.env.MAKE_PUBLISH_WEBHOOK_URL
     if (!makePublishWebhookUrl) {
         throw createError({ statusCode: 500, statusMessage: 'MAKE_PUBLISH_WEBHOOK_URL not configured' })
     }
 
-    try {
-        await $fetch(makePublishWebhookUrl, {
-            method: 'POST',
-            body: {
-                postId: post.id,
-                accountName: post.account.name,
-                imageUrl: `${process.env.APP_URL || 'http://localhost:3000'}${post.imageUrl}`,
-                caption: post.editedCaption || post.aiCaption,
-                makeConnection: (post.account as any).makeConnection,
-                webhookSecret: process.env.MAKE_WEBHOOK_SECRET
-            }
-        })
+    const appUrl = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '')
 
-        // 3. Update post status
-        const updatedPost = await (prisma as any).post.update({
-            where: { id: post.id },
-            data: {
-                status: 'published',
-                publishedAt: new Date()
-            }
-        })
-
-        return updatedPost
-    } catch (err: any) {
-        console.error(`Error manually publishing post ${post.id}:`, err)
-        throw createError({ statusCode: 500, statusMessage: 'Failed to publish to LinkedIn via Make.com' })
+    const payload = {
+        postId: post.id,
+        accountName: post.account.name,
+        imageUrl: `${appUrl}${post.imageUrl}`,
+        caption: post.editedCaption || post.aiCaption,
+        makeConnection: (post.account as any).makeConnection,
+        webhookSecret: process.env.MAKE_WEBHOOK_SECRET
     }
+
+    await triggerMakeWebhook(makePublishWebhookUrl, payload)
+
+    // 3. Update post status
+    const updatedPost = await (prisma as any).post.update({
+        where: { id: post.id },
+        data: {
+            status: 'published',
+            publishedAt: new Date()
+        }
+    })
+
+    return updatedPost
 })
