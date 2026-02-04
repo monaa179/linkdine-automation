@@ -1,8 +1,15 @@
-import { requireAuth } from '../../utils/auth'
+import { getUserFromEvent } from '../../utils/auth'
+import { verifyCronSecret } from '../../utils/webhook'
 import { prisma } from '../../utils/prisma'
 
 export default defineEventHandler(async (event) => {
-    const user = requireAuth(event)
+    // Allow either a regular user OR a valid cron call from Make
+    const user = getUserFromEvent(event)
+    const isCron = verifyCronSecret(event)
+
+    if (!user && !isCron) {
+        throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
+    }
     const id = parseInt(event.context.params?.id || '')
 
     if (isNaN(id)) {

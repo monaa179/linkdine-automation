@@ -9,48 +9,57 @@ export default defineEventHandler(async (event) => {
     const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
 
     // 1. Get posts scheduled for NOW or in the past that haven't been published
-    const postsToPublish = await prisma.post.findMany({
+    const postsToPublish = await (prisma as any).post.findMany({
         where: {
             status: 'scheduled',
             scheduledAt: { lte: now }
         },
-        include: { account: true }
+        include: {
+            account: {
+                include: { user: true }
+            }
+        },
+        orderBy: { scheduledAt: 'asc' }
     })
 
-    const publishedResults = []
-
-    for (const post of postsToPublish) {
-        const makePublishWebhookUrl = process.env.MAKE_PUBLISH_WEBHOOK_URL
-        if (makePublishWebhookUrl) {
-            try {
-                await $fetch(makePublishWebhookUrl, {
-                    method: 'POST',
-                    body: {
-                        postId: post.id,
-                        imageUrl: `${process.env.APP_URL || 'http://localhost:3000'}${post.imageUrl}`,
-                        caption: post.editedCaption || post.aiCaption,
-                        makeConnection: (post.account as any).makeConnection,
-                        webhookSecret: process.env.MAKE_WEBHOOK_SECRET
-                    }
-                })
-
-                // Update post status to published
-                await prisma.post.update({
-                    where: { id: post.id },
-                    data: {
-                        status: 'published',
-                        publishedAt: new Date()
-                    }
-                })
-                publishedResults.push(post.id)
-            } catch (err: any) {
-                console.error(`Error triggering publish for post ${post.id}:`, err)
-            }
-        }
+    if (postsToPublish.length === 0) {
+        return { message: 'No posts to publish', count: 0 }
     }
 
-    return {
-        publishedCount: publishedResults.length,
-        publishedIds: publishedResults
+    const appUrl = process.env.APP_URL || 'http://localhost:3000'
+    const makePublishWebhookUrl = process.env.MAKE_PUBLISH_WEBHOOK_URL
+
+    if (!makePublishWebhookUrl) {
+        throw createError({ statusCode: 500, statusMessage: 'MAKE_PUBLISH_WEBHOOK_URL not configured' })
+    }
+
+    const payload = {
+        timestamp: now.toISOString(),
+        webhookSecret: process.env.MAKE_WEBHOOK_SECRET,
+        posts: postsToPublish.map((post: any) => ({
+            id: post.id,
+            userEmail: post.account.user.email,
+            accountId: post.linkedinAccountId,
+            accountName: post.account.name,
+            imageUrl: post.imageUrl.startsWith('http') ? post.imageUrl : `${appUrl}${post.imageUrl}`,
+            caption: post.editedCaption || post.aiCaption,
+            makeConnection: post.account.makeConnection,
+            scheduledAt: post.scheduledAt
+        }))
+    }
+
+    try {
+        await $fetch(makePublishWebhookUrl, {
+            method: 'POST',
+            body: payload
+        })
+
+        return {
+            message: 'Posts pushed to Make.com',
+            count: postsToPublish.length
+        }
+    } catch (err: any) {
+        console.error('Error pushing posts to Make.com:', err)
+        throw createError({ statusCode: 500, statusMessage: 'Failed to push posts to Make.com' })
     }
 })

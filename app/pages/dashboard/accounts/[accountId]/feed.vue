@@ -29,9 +29,18 @@
           </div>
           <div class="feed-editor">
             <div class="editor-header">
-              <div class="date-badge" :class="{ scheduled: post.scheduledAt, warning: !post.scheduledAt }">
-                <Calendar :size="14" />
-                <span>{{ post.scheduledAt ? 'Prévu le ' + formatDate(post.scheduledAt) : 'Non planifié' }}</span>
+              <div class="date-badge-container">
+                <input 
+                  type="datetime-local" 
+                  class="date-input-hidden" 
+                  :id="'date-' + post.id"
+                  @change="(e) => updateDate(post, (e.target as HTMLInputElement).value)"
+                />
+                <label :for="'date-' + post.id" class="date-badge" :class="{ scheduled: post.scheduledAt, warning: !post.scheduledAt }">
+                  <Calendar :size="14" />
+                  <span>{{ post.scheduledAt ? 'Prévu le ' + formatDate(post.scheduledAt) : 'Non planifié' }}</span>
+                  <Edit3 :size="12" class="edit-icon" />
+                </label>
               </div>
               <div class="item-actions">
                  <button class="delete-icon" @click="deletePost(post.id)">
@@ -48,15 +57,34 @@
             />
             
             <div class="editor-footer">
-              <BaseButton 
-                size="sm" 
-                @click="saveCaption(post)" 
-                :loading="post.saving"
-              >
-                <Save :size="16" />
-                Enregistrer
-              </BaseButton>
-              <span v-if="post.saved" class="saved-badge">Enregistré !</span>
+              <div class="footer-left">
+                <BaseButton 
+                  size="sm" 
+                  @click="saveCaption(post)" 
+                  :loading="post.saving"
+                >
+                  <Save :size="16" />
+                  Enregistrer
+                </BaseButton>
+                <span v-if="post.saved" class="saved-badge">Enregistré !</span>
+              </div>
+
+              <div class="footer-right">
+                <BaseButton 
+                  v-if="post.status !== 'published'"
+                  size="sm" 
+                  variant="primary"
+                  @click="publishNow(post)" 
+                  :loading="post.publishing"
+                >
+                  <Send :size="16" />
+                  Publier
+                </BaseButton>
+                <div v-else class="published-tag">
+                  <CheckCircle2 :size="16" />
+                  Publié
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -72,7 +100,9 @@ import {
   Trash2, 
   Save, 
   CheckCircle2,
-  Calendar
+  Calendar,
+  Send,
+  Edit3
 } from 'lucide-vue-next'
 
 definePageMeta({
@@ -99,7 +129,8 @@ const fetchAccountData = async () => {
         ...p,
         editedCaption: p.editedCaption || p.aiCaption || '',
         saving: false,
-        saved: false
+        saved: false,
+        publishing: false
       }))
   } catch (e) {
     console.error('Failed to fetch account data', e)
@@ -115,15 +146,51 @@ const saveCaption = async (post: any) => {
     await $fetch(`/api/posts/${post.id}`, {
       method: 'PATCH',
       body: { 
-        editedCaption: post.editedCaption
+        editedCaption: post.editedCaption,
+        status: post.status // Maintain status
       }
     })
     post.saved = true
     setTimeout(() => { post.saved = false }, 3000)
   } catch (e) {
-    alert('Erreur lors de la sauvegarde.')
+    console.error('Failed to save caption', e)
   } finally {
     post.saving = false
+  }
+}
+
+const updateDate = async (post: any, newDate: string) => {
+  if (!newDate) return
+  try {
+    const data = await $fetch<any>(`/api/posts/${post.id}`, {
+      method: 'PATCH',
+      body: { 
+        scheduledAt: new Date(newDate).toISOString(),
+        status: 'scheduled'
+      }
+    })
+    post.scheduledAt = data.scheduledAt
+    post.status = 'scheduled'
+  } catch (e) {
+    console.error('Failed to update date', e)
+  }
+}
+
+const publishNow = async (post: any) => {
+  if (!confirm('Voulez-vous vraiment publier ce post maintenant sur LinkedIn ?')) return
+  
+  post.publishing = true
+  try {
+    const data = await $fetch<any>(`/api/posts/${post.id}/publish`, {
+      method: 'POST'
+    })
+    post.status = 'published'
+    post.publishedAt = data.publishedAt
+  } catch (e) {
+    console.error('Failed to publish', e)
+    alert('Erreur lors de la publication. Vérifiez le scénario Make.com.')
+  } finally {
+    post.publishing = false
   }
 }
 
@@ -218,6 +285,34 @@ onMounted(fetchAccountData)
   align-items: center;
 }
 
+.editor-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.footer-left, .footer-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.date-badge-container {
+  position: relative;
+}
+
+.date-input-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
 .date-badge {
   display: flex;
   align-items: center;
@@ -227,6 +322,13 @@ onMounted(fetchAccountData)
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.date-badge:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
 .date-badge.scheduled {
@@ -239,6 +341,23 @@ onMounted(fetchAccountData)
   background: rgba(234, 179, 8, 0.1);
   color: #eab308;
   border: 1px solid rgba(234, 179, 8, 0.2);
+}
+
+.edit-icon {
+  opacity: 0.5;
+  margin-left: 0.25rem;
+}
+
+.published-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #10b981;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.375rem 0.75rem;
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 20px;
 }
 
 .date-badge span {
@@ -265,12 +384,6 @@ onMounted(fetchAccountData)
   color: #ef4444;
 }
 
-.editor-footer {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  margin-top: auto;
-}
 
 .saved-badge {
   color: var(--accent-primary);
