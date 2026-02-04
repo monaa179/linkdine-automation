@@ -100,8 +100,14 @@
             <BaseInput v-model.number="newAccount.postingFrequency" type="number" label="Fréquence" />
           </div>
 
-          <div class="form-row">
-            <BaseInput v-model="newAccount.postingDay" label="Jour (ex: monday)" placeholder="monday" />
+          <div class="form-section">
+            <BaseCheckboxGroup
+              v-if="newAccount.postingPeriod === 'week'"
+              v-model="selectedDaysNew"
+              label="Jours de publication"
+              :options="dayOptions"
+            />
+            <BaseInput v-else-if="newAccount.postingPeriod === 'month'" v-model="newAccount.postingDay" label="Jour du mois (ex: 15)" placeholder="15" />
             <BaseInput v-model="newAccount.postingHour" type="time" label="Heure" />
           </div>
 
@@ -118,7 +124,12 @@
           <BaseInput v-model="editAccount.makeConnection" label="Make Connection ID" required />
           
           <div class="base-textarea-container">
-            <label class="label">Context Prompt (AI)</label>
+            <div class="label-header">
+              <label class="label">Context Prompt (AI)</label>
+              <span class="char-count" :class="{ warning: editAccount.contextPrompt.length > 800 }">
+                {{ editAccount.contextPrompt.length }}/1000
+              </span>
+            </div>
             <div class="textarea-wrapper">
               <textarea v-model="editAccount.contextPrompt" class="textarea" rows="4"></textarea>
             </div>
@@ -136,8 +147,14 @@
             <BaseInput v-model.number="editAccount.postingFrequency" type="number" label="Fréquence" />
           </div>
 
-          <div class="form-row">
-            <BaseInput v-model="editAccount.postingDay" label="Jour" />
+          <div class="form-section">
+            <BaseCheckboxGroup
+              v-if="editAccount.postingPeriod === 'week'"
+              v-model="selectedDaysEdit"
+              label="Jours de publication"
+              :options="dayOptions"
+            />
+            <BaseInput v-else-if="editAccount.postingPeriod === 'month'" v-model="editAccount.postingDay" label="Jour du mois (ex: 15)" />
             <BaseInput v-model="editAccount.postingHour" type="time" label="Heure" />
           </div>
 
@@ -162,11 +179,25 @@
 
 <script setup lang="ts">
 import { Link2, Trash2, Settings, CheckCircle2, Sparkles, Image, LayoutPanelLeft } from 'lucide-vue-next'
+import BaseCheckboxGroup from '~/components/BaseCheckboxGroup.vue'
 
 definePageMeta({
   layout: false,
   middleware: ['auth']
 })
+
+const dayOptions = [
+  { label: 'Lun', value: 'monday' },
+  { label: 'Mar', value: 'tuesday' },
+  { label: 'Mer', value: 'wednesday' },
+  { label: 'Jeu', value: 'thursday' },
+  { label: 'Ven', value: 'friday' },
+  { label: 'Sam', value: 'saturday' },
+  { label: 'Dim', value: 'sunday' }
+]
+
+const selectedDaysNew = ref<string[]>(['monday'])
+const selectedDaysEdit = ref<string[]>(['monday'])
 
 const { currentAccountId, setCurrentAccountId } = useCurrentAccount()
 const router = useRouter()
@@ -203,6 +234,11 @@ const fetchAccounts = async () => {
 
 const handleAddAccount = async () => {
   try {
+    // Join selected days for backend
+    if (newAccount.postingPeriod === 'week') {
+      newAccount.postingDay = selectedDaysNew.value.join(',')
+    }
+
     await $fetch('/api/accounts', {
       method: 'POST',
       body: newAccount
@@ -218,6 +254,7 @@ const handleAddAccount = async () => {
       postingDay: 'monday',
       postingHour: '09:00'
     })
+    selectedDaysNew.value = ['monday']
     await fetchAccounts()
   } catch (e) {
     alert('Erreur lors de l\'ajout du compte')
@@ -227,6 +264,11 @@ const handleAddAccount = async () => {
 const handleUpdateAccount = async () => {
   if (!editAccount.value) return
   try {
+    // Join selected days for backend
+    if (editAccount.value.postingPeriod === 'week') {
+      editAccount.value.postingDay = selectedDaysEdit.value.join(',')
+    }
+
     await $fetch(`/api/accounts/${editAccount.value.id}`, {
       method: 'PATCH',
       body: editAccount.value
@@ -244,6 +286,12 @@ const connectNewAccount = () => {
 
 const openSettings = (account: any) => {
   editAccount.value = { ...account }
+  // Parse days for frontend
+  if (editAccount.value.postingPeriod === 'week' && editAccount.value.postingDay) {
+    selectedDaysEdit.value = editAccount.value.postingDay.split(',')
+  } else {
+    selectedDaysEdit.value = []
+  }
   showEditModal.value = true
 }
 
@@ -529,5 +577,92 @@ onMounted(fetchAccounts)
 @keyframes pulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 0.8; }
+}
+
+/* Modal Form Specifics */
+.label-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.char-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.char-count.warning {
+  color: var(--warning);
+}
+
+.prompt-help {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(59, 130, 246, 0.05);
+  border-left: 3px solid var(--accent-primary);
+  border-radius: 4px;
+}
+
+.prompt-help p {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin: 1rem 0;
+}
+
+.select {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  padding: 0.5rem;
+  width: 100%;
+  outline: none;
+}
+
+.select:focus {
+  border-color: var(--accent-primary);
+}
+
+.textarea-wrapper {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-glass);
+  border-radius: 0.75rem;
+  transition: all var(--transition-normal);
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.textarea-wrapper:focus-within {
+  border-color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+}
+
+.textarea {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  width: 100%;
+  outline: none;
+  padding: 1rem;
+  min-height: 120px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+.textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.4;
 }
 </style>

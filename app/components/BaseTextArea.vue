@@ -54,17 +54,17 @@ const focused = ref(false)
 }
 
 .textarea-wrapper {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-glass);
   border-radius: 0.75rem;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-normal);
   width: 100%;
 }
 
 .textarea-wrapper.focused {
   border-color: var(--accent-primary);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
 }
 
 .textarea-wrapper.error {
@@ -75,13 +75,14 @@ const focused = ref(false)
   background: transparent;
   border: none;
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: 0.9375rem;
   width: 100%;
   outline: none;
-  padding: 0.75rem 1rem;
-  min-height: 100px;
+  padding: 1rem;
+  min-height: 120px;
   resize: vertical;
   font-family: inherit;
+  line-height: 1.6;
 }
 
 .textarea::placeholder {
