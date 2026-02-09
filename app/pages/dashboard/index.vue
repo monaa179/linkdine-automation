@@ -9,18 +9,6 @@
         </div>
       </ClientOnly>
 
-      <!-- No Account Selected Overlay -->
-      <div v-if="!currentAccountId && !loading" class="account-selector-overlay glass-heavy animate-fade-in">
-        <div class="overlay-content">
-          <div class="overlay-icon"><Link2 :size="48" /></div>
-          <h2>Aucun compte sélectionné</h2>
-          <p>Vous devez sélectionner un compte LinkedIn pour voir les statistiques et gérer les publications.</p>
-          <NuxtLink to="/dashboard/accounts">
-            <BaseButton variant="primary" size="lg">Sélectionner un compte</BaseButton>
-          </NuxtLink>
-        </div>
-      </div>
-
       <!-- Stats Grid -->
       <div class="stats-grid">
         <BaseCard v-for="stat in stats" :key="stat.label">
@@ -60,14 +48,11 @@
         <!-- Quick Actions / Linked Accounts -->
         <BaseCard>
           <template #header>
-            <h3>Comptes Connectés</h3>
+            <h3>Mes Comptes</h3>
           </template>
           
           <div v-if="accounts.length === 0" class="empty-state sm">
-            <p>Aucun compte LinkedIn connecté</p>
-            <NuxtLink to="/dashboard/accounts">
-              <BaseButton size="sm" variant="primary">Connecter</BaseButton>
-            </NuxtLink>
+            <p>Aucun compte LinkedIn trouvé</p>
           </div>
           <div v-else class="accounts-mini-list">
             <div v-for="account in accounts" :key="account.id" class="account-item">
@@ -110,16 +95,20 @@ const stats = computed(() => [
 
 onMounted(async () => {
   try {
+    const promises: Promise<any>[] = [
+      $fetch<any[]>('/api/accounts')
+    ]
+    
     if (currentAccountId.value) {
-      const [postsData, accountsData, _] = await Promise.all([
-        $fetch<any[]>(`/api/posts?accountId=${currentAccountId.value}&limit=5`),
-        $fetch<any[]>('/api/accounts'), // Fetch all accounts to show in mini-list
-        fetchCurrentAccount()
-      ])
-      posts.value = postsData
-      accounts.value = accountsData
-    } else {
-      loading.value = false
+      promises.push($fetch<any[]>(`/api/posts?accountId=${currentAccountId.value}&limit=5`))
+      promises.push(fetchCurrentAccount())
+    }
+
+    const results = await Promise.all(promises)
+    accounts.value = results[0]
+    
+    if (currentAccountId.value && results[1]) {
+      posts.value = results[1]
     }
   } catch (e) {
     console.error('Failed to fetch dashboard data', e)
@@ -276,52 +265,6 @@ onMounted(async () => {
   border-top-color: var(--accent-primary);
   border-radius: 50%;
   animation: spin 1s infinite linear;
-}
-
-.account-selector-overlay {
-  position: fixed;
-  top: 100px;
-  left: 310px; /* Sidebar width + some padding */
-  right: 30px;
-  bottom: 30px;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 2rem;
-  backdrop-filter: blur(8px);
-  background: rgba(0, 0, 0, 0.4);
-}
-
-.overlay-content {
-  text-align: center;
-  max-width: 400px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 3rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-glass);
-  border-radius: 2rem;
-}
-
-.overlay-icon {
-  width: 80px;
-  height: 80px;
-  background: var(--accent-gradient);
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  margin-bottom: 0.5rem;
-}
-
-@media (max-width: 1024px) {
-  .account-selector-overlay {
-    left: 30px;
-  }
 }
 
 @keyframes spin {

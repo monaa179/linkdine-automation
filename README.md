@@ -1,75 +1,70 @@
-# Nuxt Minimal Starter
+# LinkedIn Automation Platform
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+A modern, high-performance web application designed to manage and automate LinkedIn content creation and publishing across multiple accounts.
 
-## Setup
+## 🚀 Key Features
 
-Make sure to install dependencies:
+### 👤 User & Role Management
+- **Role-Based Access Control (RBAC)**: Supports `admin` and `user` roles.
+- **Admin Dashboard**: Dedicated interface for administrators to create, update, and delete users.
+- **Secure Authentication**: Built-in login system with encrypted passwords and JWT-based session management.
+- **Controlled Registration**: Public registration is disabled; only administrators can provision new accounts.
 
-```bash
-# npm
-npm install
+### 💼 Multi-Account Workspace
+- **Dedicated Account Spaces**: Each LinkedIn account has its own workspace with a specialized "Feed" and "Gallery".
+- **Real-Time Auto-Save**: All modifications to account settings (posting frequency, AI context prompts, etc.) are saved automatically in real-time.
+- **Simplified Navigation**: Quick switching between accounts with a persistent sidebar and account-specific headers.
 
-# pnpm
-pnpm install
+### 📝 AI-Powered Content Feed
+- **Intelligent Captions**: View and edit AI-generated captions for your LinkedIn posts.
+- **Seamless Editing**: Caption edits are automatically saved as you type.
+- **Scheduling & Publishing**: Plan your posts with an integrated calendar and publish them directly to LinkedIn via Make.com integration.
 
-# yarn
-yarn install
+## 🛠 Tech Stack
 
-# bun
-bun install
+- **Frontend & Backend**: [Nuxt 4](https://nuxt.com/) (Vue 3, Nitro)
+- **Database**: MySQL managed via [Prisma ORM](https://www.prisma.io/)
+- **Authentication**: JWT & Bcryptjs
+- **Icons**: Lucide Vue Next
+- **Styling**: Vanilla CSS with modern Glassmorphism aesthetics
+
+## 📂 Project Structure
+
+```text
+├── app/                  # Frontend components, pages, and logic
+│   ├── components/       # Reusable UI components (Sidebar, Navbar, Base UI)
+│   ├── composables/      # Shared state and logic (auth, current account)
+│   ├── layouts/          # Page layouts (auth, dashboard)
+│   └── pages/            # Nuxt routes (auth, accounts, dashboard)
+├── server/               # Backend API and server-side logic
+│   ├── api/              # API endpoints (auth, accounts, posts, users)
+│   └── utils/            # Server utilities (auth helpers, prisma client)
+├── prisma/               # Database schema and migrations
+└── public/               # Static assets
 ```
 
-## Development Server
+## ⚙️ Setup & Installation
 
-Start the development server on `http://localhost:3000`:
+1. **Clone the project**
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+3. **Configure Environment Variables**:
+   Create a `.env` file based on `.env.example`:
+   ```env
+   DATABASE_URL="mysql://user:pass@localhost:3306/db_name"
+   JWT_SECRET="your-secret-key"
+   ```
+4. **Database Setup**:
+   ```bash
+   npx prisma db push
+   npx prisma generate
+   ```
+5. **Run in Development**:
+   ```bash
+   npm run dev
+   ```
 
-```bash
-# npm
-npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
-```
-
-## Production
-
-Build the application for production:
-
-```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+## 🔐 Admin Access
+To promote a user to administrator via the database, you can use the Prisma Studio or run a custom script to update the `role` field in the `users` table to `'admin'`.

@@ -34,16 +34,24 @@
 import { 
   LayoutDashboard, 
   Link2, 
-  LogOut,
-  PlusCircle
+  Users,
+  LogOut
 } from 'lucide-vue-next'
 
 const { user, logout } = useAuth()
 
-const menuItems = [
-  { label: 'Tableau de bord', path: '/dashboard', icon: LayoutDashboard },
-  { label: 'Comptes LinkedIn', path: '/dashboard/accounts', icon: Link2 },
-]
+const menuItems = computed(() => {
+  const items = [
+    { label: 'Tableau de bord', path: '/dashboard', icon: LayoutDashboard },
+    { label: 'Comptes LinkedIn', path: '/dashboard/accounts', icon: Link2 },
+  ]
+
+  if (user.value?.role === 'admin') {
+    items.push({ label: 'Utilisateurs', path: '/dashboard/users', icon: Users })
+  }
+
+  return items
+})
 
 const handleLogout = () => {
   logout()

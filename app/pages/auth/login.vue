@@ -31,10 +31,6 @@
         <BaseButton type="submit" :loading="loading" block class="submit-btn">
           Se connecter
         </BaseButton>
-        <p class="footer-text">
-          Pas encore de compte ? 
-          <NuxtLink to="/auth/register" class="link">S'inscrire</NuxtLink>
-        </p>
       </div>
     </form>
   </AuthLayout>

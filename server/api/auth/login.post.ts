@@ -24,7 +24,11 @@ export default defineEventHandler(async (event) => {
         })
     }
 
-    const token = generateToken({ userId: user.id, email: user.email })
+    const token = generateToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role
+    })
 
     // Set cookie
     setCookie(event, 'auth_token', token, {
@@ -36,6 +40,7 @@ export default defineEventHandler(async (event) => {
 
     return {
         id: user.id,
-        email: user.email
+        email: user.email,
+        role: user.role
     }
 })

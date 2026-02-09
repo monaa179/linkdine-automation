@@ -12,6 +12,7 @@ model User {
   email        String    @unique
   passwordHash String
   createdAt    DateTime  @default(now())
+  role         UserRole  @default(user)
   accounts     Account[]
 
   @@map("users")
@@ -49,6 +50,11 @@ model Post {
 
   @@index([accountId], map: "posts_accountId_fkey")
   @@map("posts")
+}
+
+enum UserRole {
+  admin
+  user
 }
 
 enum PostingPeriod {

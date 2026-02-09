@@ -7,6 +7,7 @@ const SALT_ROUNDS = 12
 interface JwtPayload {
     userId: number
     email: string
+    role: 'admin' | 'user'
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -62,6 +63,17 @@ export function requireAuth(event: H3Event): JwtPayload {
         throw createError({
             statusCode: 401,
             statusMessage: 'Unauthorized'
+        })
+    }
+    return user
+}
+
+export function requireAdmin(event: H3Event): JwtPayload {
+    const user = requireAuth(event)
+    if (user.role !== 'admin') {
+        throw createError({
+            statusCode: 403,
+            statusMessage: 'Forbidden'
         })
     }
     return user

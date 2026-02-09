@@ -1,12 +1,10 @@
-import { getUserFromEvent } from '../../utils/auth'
+import { requireAuth } from '../../utils/auth'
 
 export default defineEventHandler((event) => {
-    const user = getUserFromEvent(event)
-    if (!user) {
-        throw createError({
-            statusCode: 401,
-            statusMessage: 'Unauthorized'
-        })
+    const user = requireAuth(event)
+    return {
+        id: user.userId,
+        email: user.email,
+        role: user.role
     }
-    return user
 })

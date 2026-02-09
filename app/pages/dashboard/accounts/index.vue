@@ -26,14 +26,19 @@
       </div>
 
       <div v-else class="accounts-grid">
-        <BaseCard v-for="account in accounts" :key="account.id" class="account-card">
+        <BaseCard 
+          v-for="account in accounts" 
+          :key="account.id" 
+          class="account-card clickable"
+          @click="goToAccountSpace(account.id)"
+        >
           <div class="account-header">
             <div class="account-avatar">{{ account.name[0] }}</div>
             <div class="account-meta">
               <h3>{{ account.name }}</h3>
               <span class="badge">{{ account.postingPeriod }}</span>
             </div>
-            <div class="account-actions">
+            <div class="account-actions" @click.stop>
               <button class="icon-btn" title="Paramètres" @click="openSettings(account)">
                 <Settings :size="18" />
               </button>
@@ -57,34 +62,6 @@
             </div>
           </div>
           
-          <div class="account-nav">
-            <NuxtLink :to="`/dashboard/accounts/${account.id}/gallery`" class="nav-btn gallery">
-              <Image :size="18" />
-              <span>Galerie</span>
-            </NuxtLink>
-            <NuxtLink :to="`/dashboard/accounts/${account.id}/feed`" class="nav-btn feed">
-              <LayoutPanelLeft :size="18" />
-              <span>Feed</span>
-            </NuxtLink>
-          </div>
-          
-          <template #footer>
-            <div class="account-footer">
-              <BaseButton 
-                v-if="currentAccountId !== account.id"
-                variant="outline" 
-                size="sm" 
-                @click="selectAccount(account)"
-                block
-              >
-                Connecter ce compte
-              </BaseButton>
-              <div v-else class="selected-badge">
-                <CheckCircle2 :size="16" />
-                Connecté
-              </div>
-            </div>
-          </template>
         </BaseCard>
       </div>
 
@@ -169,7 +146,6 @@
           </div>
 
           <div class="form-actions">
-            <BaseButton type="submit" variant="primary" block>Enregistrer</BaseButton>
             <BaseButton 
               type="button" 
               variant="outline" 
@@ -188,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { Link2, Trash2, Settings, CheckCircle2, Sparkles, Image, LayoutPanelLeft, Calendar } from 'lucide-vue-next'
+import { Link2, Trash2, Settings, CheckCircle2, Sparkles, Calendar } from 'lucide-vue-next'
 import BaseCheckboxGroup from '~/components/BaseCheckboxGroup.vue'
 
 definePageMeta({
@@ -240,7 +216,6 @@ const updatePreview = async () => {
   }
 }
 
-watch([() => editAccount.value?.postingPeriod, () => editAccount.value?.postingFrequency, () => editAccount.value?.postingHour, selectedDaysEdit, () => editAccount.value?.postingDay], updatePreview, { deep: true })
 
 
 const newAccount = reactive({
@@ -306,12 +281,21 @@ const handleUpdateAccount = async () => {
       method: 'PATCH',
       body: editAccount.value
     })
-    showEditModal.value = false
+    // We don't close the modal anymore since it's auto-save
     await fetchAccounts()
   } catch (e) {
-    alert('Erreur lors de la mise à jour')
+    console.error('Failed to update account', e)
   }
 }
+
+watch([() => editAccount.value?.postingPeriod, () => editAccount.value?.postingFrequency, () => editAccount.value?.postingHour, selectedDaysEdit, () => editAccount.value?.postingDay], () => {
+  updatePreview()
+  handleUpdateAccount()
+}, { deep: true })
+
+watch(() => editAccount.value?.name, () => handleUpdateAccount())
+watch(() => editAccount.value?.makeConnection, () => handleUpdateAccount())
+watch(() => editAccount.value?.contextPrompt, () => handleUpdateAccount())
 
 const connectNewAccount = () => {
   showAddModal.value = true
@@ -348,7 +332,11 @@ const confirmDelete = async (account: any) => {
 
 const selectAccount = (account: any) => {
   setCurrentAccountId(account.id)
-  router.push('/dashboard')
+}
+
+const goToAccountSpace = (accountId: number) => {
+  setCurrentAccountId(accountId)
+  router.push(`/dashboard/accounts/${accountId}/feed`)
 }
 
 const generatePosts = async (account: any) => {
@@ -419,6 +407,17 @@ onMounted(fetchAccounts)
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.account-card.clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.account-card.clickable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+  border-color: var(--accent-primary);
 }
 
 .account-header {
@@ -527,36 +526,6 @@ onMounted(fetchAccounts)
   background: var(--border-glass);
 }
 
-.account-nav {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-.nav-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  border-radius: 0.75rem;
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.875rem;
-  transition: all var(--transition-fast);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-glass);
-  color: var(--text-primary);
-}
-
-.nav-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--accent-primary);
-  transform: translateY(-2px);
-}
-
-.nav-btn.gallery { color: var(--accent-secondary); }
-.nav-btn.feed { color: var(--accent-primary); }
 
 .account-footer {
   width: 100%;

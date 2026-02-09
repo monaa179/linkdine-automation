@@ -1,9 +1,11 @@
-import { hashPassword, generateToken } from '../../utils/auth'
+import { requireAdmin, hashPassword } from '../../utils/auth'
 import { prisma } from '../../utils/prisma'
 
 export default defineEventHandler(async (event) => {
+    requireAdmin(event)
+
     const body = await readBody(event)
-    const { email, password } = body
+    const { email, password, role } = body
 
     if (!email || !password) {
         throw createError({
@@ -24,27 +26,20 @@ export default defineEventHandler(async (event) => {
         })
     }
 
-    // Create user
     const passwordHash = await hashPassword(password)
     const user = await prisma.user.create({
         data: {
             email,
-            passwordHash
+            passwordHash,
+            role: role || 'user'
+        },
+        select: {
+            id: true,
+            email: true,
+            role: true,
+            createdAt: true
         }
     })
 
-    const token = generateToken({ userId: user.id, email: user.email })
-
-    // Set cookie
-    setCookie(event, 'auth_token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7 // 7 days
-    })
-
-    return {
-        id: user.id,
-        email: user.email
-    }
+    return user
 })

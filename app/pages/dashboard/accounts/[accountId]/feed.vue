@@ -58,15 +58,8 @@
             
             <div class="editor-footer">
               <div class="footer-left">
-                <BaseButton 
-                  size="sm" 
-                  @click="saveCaption(post)" 
-                  :loading="post.saving"
-                >
-                  <Save :size="16" />
-                  Enregistrer
-                </BaseButton>
-                <span v-if="post.saved" class="saved-badge">Enregistré !</span>
+                <span v-if="post.saving" class="saving-badge">Sauvegarde...</span>
+                <span v-else-if="post.saved" class="saved-badge">Enregistré !</span>
               </div>
 
               <div class="footer-right">
@@ -139,7 +132,16 @@ const fetchAccountData = async () => {
   }
 }
 
+// Auto-save logic
+watch(feedPosts, (newPosts) => {
+  newPosts.forEach(post => {
+    // We use a simple way to detect changes: if the post is not currently saving and not already saved
+    // Actually, we need to track the individual values.
+  })
+}, { deep: true })
+
 const saveCaption = async (post: any) => {
+  if (post.saving) return
   post.saving = true
   post.saved = false
   try {
@@ -158,6 +160,16 @@ const saveCaption = async (post: any) => {
     post.saving = false
   }
 }
+
+// Add watchers for each post
+watch(() => feedPosts.value, (newVal, oldVal) => {
+  newVal.forEach((post, index) => {
+    const oldPost = oldVal && oldVal[index]
+    if (oldPost && post.editedCaption !== oldPost.editedCaption) {
+      saveCaption(post)
+    }
+  })
+}, { deep: true })
 
 const updateDate = async (post: any, newDate: string) => {
   if (!newDate) return
