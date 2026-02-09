@@ -42,7 +42,6 @@
           <template #header>
             <div class="card-header-flex">
               <h3>Derniers Posts</h3>
-              <NuxtLink to="/dashboard/posts" class="view-all">Voir tout</NuxtLink>
             </div>
           </template>
           
@@ -52,9 +51,6 @@
           <div v-else-if="posts.length === 0" class="empty-state">
             <div class="empty-icon"><FileText :size="40" /></div>
             <p>Aucun post récent</p>
-            <NuxtLink to="/dashboard/posts/create">
-              <BaseButton size="sm" variant="outline">Créer votre premier post</BaseButton>
-            </NuxtLink>
           </div>
           <div v-else class="posts-list">
             <!-- List items here -->
@@ -90,9 +86,7 @@
 
 <script setup lang="ts">
 import { 
-  Send, 
   CheckCircle2, 
-  FileEdit, 
   Clock, 
   FileText,
   Link2,
@@ -111,10 +105,7 @@ const posts = ref<any[]>([])
 const accounts = ref<any[]>([])
 
 const stats = computed(() => [
-  { label: 'Programmés', value: 0, icon: Clock, color: '#3b82f6' },
-  { label: 'Publiés', value: 0, icon: CheckCircle2, color: '#22c55e' },
-  { label: 'Brouillons', value: 0, icon: FileEdit, color: '#f59e0b' },
-  { label: 'Comptes', value: accounts.value.length, icon: Link2, color: '#8b5cf6' },
+  { label: 'Comptes LinkedIn', value: accounts.value.length, icon: Link2, color: '#8b5cf6' },
 ])
 
 onMounted(async () => {

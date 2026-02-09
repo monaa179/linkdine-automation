@@ -33,9 +33,7 @@
 <script setup lang="ts">
 import { 
   LayoutDashboard, 
-  Send, 
   Link2, 
-  Settings, 
   LogOut,
   PlusCircle
 } from 'lucide-vue-next'
@@ -44,9 +42,7 @@ const { user, logout } = useAuth()
 
 const menuItems = [
   { label: 'Tableau de bord', path: '/dashboard', icon: LayoutDashboard },
-  { label: 'Mes Posts', path: '/dashboard/posts', icon: Send },
   { label: 'Comptes LinkedIn', path: '/dashboard/accounts', icon: Link2 },
-  { label: 'Paramètres', path: '/dashboard/settings', icon: Settings },
 ]
 
 const handleLogout = () => {

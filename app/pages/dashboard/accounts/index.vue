@@ -8,7 +8,7 @@
         </div>
         <BaseButton @click="connectNewAccount" :loading="connecting">
           <Link2 :size="18" />
-          Connecter un compte
+          Ajouter un compte LinkdIn
         </BaseButton>
       </div>
 
@@ -89,7 +89,7 @@
       </div>
 
       <!-- Add Account Modal -->
-      <BaseModal v-if="showAddModal" title="Connecter un compte" @close="showAddModal = false">
+      <BaseModal v-if="showAddModal" title="Créer un nouveau compte" @close="showAddModal = false">
         <form @submit.prevent="handleAddAccount" class="account-form">
           <BaseInput v-model="newAccount.name" label="Nom du compte" placeholder="ex: Mon Profile Perso" required />
           <BaseInput v-model="newAccount.makeConnection" label="Make Connection ID" placeholder="ex: linkedin-connection-1" required />
