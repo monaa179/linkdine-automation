@@ -1,70 +1,126 @@
-# LinkedIn Automation Platform
+# 🚀 LinkedIn Automation Platform
 
-A modern, high-performance web application designed to manage and automate LinkedIn content creation and publishing across multiple accounts.
+A robust, enterprise-grade web application for automating LinkedIn content creation and multi-account management, powered by Nuxt 4 and Make.com.
 
-## 🚀 Key Features
+## 🛠 Technical Architecture
 
-### 👤 User & Role Management
-- **Role-Based Access Control (RBAC)**: Supports `admin` and `user` roles.
-- **Admin Dashboard**: Dedicated interface for administrators to create, update, and delete users.
-- **Secure Authentication**: Built-in login system with encrypted passwords and JWT-based session management.
-- **Controlled Registration**: Public registration is disabled; only administrators can provision new accounts.
+- **Frontend & Backend**: [Nuxt 4](https://nuxt.com/) (Vue 3 with Composition API + Nitro Server Engine)
+- **Database**: MySQL via [Prisma ORM](https://www.prisma.io/)
+- **Authentication**: JWT (JSON Web Tokens) with `bcryptjs` for password hashing
+- **Automation Logic**: Integrated webhooks for [Make.com](https://make.com) and internal cron services
+- **UI System**: Vanilla CSS with modern Glassmorphism aesthetics and [Lucide](https://lucide.dev/) icons
+
+---
+
+## ✨ Core Features
+
+### 👤 Advanced User Management
+- **RBAC (Role-Based Access Control)**: Strictly defined `admin` and `user` roles.
+- **Admin Control**: Centralized dashboard for user provisioning (Public registration is disabled).
+- **Security**: Encrypted session management and secure API endpoints.
 
 ### 💼 Multi-Account Workspace
-- **Dedicated Account Spaces**: Each LinkedIn account has its own workspace with a specialized "Feed" and "Gallery".
-- **Real-Time Auto-Save**: All modifications to account settings (posting frequency, AI context prompts, etc.) are saved automatically in real-time.
-- **Simplified Navigation**: Quick switching between accounts with a persistent sidebar and account-specific headers.
+- **Isolated Accounts**: Each LinkedIn account acts as a separate workspace with distinct settings.
+- **Dynamic Config**: Real-time auto-saving for AI prompts, posting frequency, and scheduling.
+- **Integrated Gallery**: Centralized media management for each account.
 
-### 📝 AI-Powered Content Feed
-- **Intelligent Captions**: View and edit AI-generated captions for your LinkedIn posts.
-- **Seamless Editing**: Caption edits are automatically saved as you type.
-- **Scheduling & Publishing**: Plan your posts with an integrated calendar and publish them directly to LinkedIn via Make.com integration.
+### 🤖 AI-Powered Automation
+- **Make.com Integration**: Automated generation of LinkedIn-optimized captions from uploaded images.
+- **Intelligent Scheduling**: Custom `scheduler` utility calculates optimal posting slots based on user preferences.
+- **Real-Time Edits**: Live feedback loop for editing AI-generated content before publication.
 
-## 🛠 Tech Stack
+---
 
-- **Frontend & Backend**: [Nuxt 4](https://nuxt.com/) (Vue 3, Nitro)
-- **Database**: MySQL managed via [Prisma ORM](https://www.prisma.io/)
-- **Authentication**: JWT & Bcryptjs
-- **Icons**: Lucide Vue Next
-- **Styling**: Vanilla CSS with modern Glassmorphism aesthetics
+## 🔄 Automation Flow (Make.com)
+
+The system operates on a 3-step automation cycle:
+
+1.  **Trigger**: User uploads an image and requests a post. The system sends a payload to Make.com (`MAKE_WEBHOOK_URL`).
+2.  **AI Generation**: Make.com processes the image, generates a caption via AI, and sends it back to `/api/make/caption-generated`.
+3.  **Scheduling**: The system automatically schedules the post using the account's frequency settings.
+4.  **Publishing**: A cron job calls `/api/cron/schedule-posts`, which pushes ready posts to Make.com for final LinkedIn publication.
+
+---
 
 ## 📂 Project Structure
 
 ```text
-├── app/                  # Frontend components, pages, and logic
-│   ├── components/       # Reusable UI components (Sidebar, Navbar, Base UI)
-│   ├── composables/      # Shared state and logic (auth, current account)
-│   ├── layouts/          # Page layouts (auth, dashboard)
-│   └── pages/            # Nuxt routes (auth, accounts, dashboard)
-├── server/               # Backend API and server-side logic
-│   ├── api/              # API endpoints (auth, accounts, posts, users)
-│   └── utils/            # Server utilities (auth helpers, prisma client)
-├── prisma/               # Database schema and migrations
-└── public/               # Static assets
+├── app/                  # Frontend Layer
+│   ├── components/       # UI Components (Sidebar, Navbar, Modals)
+│   ├── composables/      # Shared Logic (Auth, Account State)
+│   ├── layouts/          # Persistent Layouts (Auth, Dashboard)
+│   └── pages/            # Nuxt File-system Routing
+├── server/               # Backend Layer (Nitro)
+│   ├── api/              # RESTful API Endpoints
+│   │   ├── cron/         # Scheduling & Publication Jobs
+│   │   ├── make/         # Incoming Webhooks from Make.com
+│   │   └── auth/         # Security & Sessions
+│   └── utils/            # Prisma Client, Schedulers, Webhook Auth
+├── prisma/               # Data Layer (Schema & Migrations)
+└── public/               # Static Media Assets
 ```
+
+---
 
 ## ⚙️ Setup & Installation
 
-1. **Clone the project**
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-3. **Configure Environment Variables**:
-   Create a `.env` file based on `.env.example`:
-   ```env
-   DATABASE_URL="mysql://user:pass@localhost:3306/db_name"
-   JWT_SECRET="your-secret-key"
-   ```
-4. **Database Setup**:
-   ```bash
-   npx prisma db push
-   npx prisma generate
-   ```
-5. **Run in Development**:
-   ```bash
-   npm run dev
-   ```
+### 1. Prerequisites
+- Node.js (v18+)
+- MySQL Database
 
-## 🔐 Admin Access
-To promote a user to administrator via the database, you can use the Prisma Studio or run a custom script to update the `role` field in the `users` table to `'admin'`.
+### 2. Dependency Installation
+```bash
+npm install
+```
+
+### 3. Environment Configuration
+Create a `.env` file in the root directory:
+
+```env
+# Database
+DATABASE_URL="mysql://user:pass@localhost:3306/db_name"
+
+# Security
+JWT_SECRET="your-high-entropy-secret"
+WEBHOOK_SECRET="secret-for-make-validation"
+CRON_SECRET="secret-for-cron-validation"
+
+# URLs
+APP_URL="http://localhost:3000"
+MAKE_WEBHOOK_URL="https://hook.make.com/..."
+MAKE_PUBLISH_WEBHOOK_URL="https://hook.make.com/..."
+```
+
+### 4. Database Initialization
+```bash
+npx prisma db push
+npx prisma generate
+```
+
+### 5. Running the Application
+```bash
+# Development mode
+npm run dev
+
+# Production build
+npm run build
+npm run preview
+```
+
+---
+
+## 🔐 Administration & Operations
+
+### Promoting a User to Admin
+Since registration is closed, use the Prisma Studio to modify user roles:
+```bash
+npx prisma studio
+```
+Navigate to the `users` table and update the `role` field to `admin`.
+
+### Scheduling Logic Details
+The `getNextAvailableSlots` utility (located in `server/utils/scheduler.ts`) handles the distribution of posts based on:
+- **`postingPeriod`**: day, week, or month.
+- **`postingFrequency`**: Number of posts per period.
+- **`postingDay`**: Targeted days for weekly/monthly schedules.
+- **`postingHour`**: The specific time window for publication.
