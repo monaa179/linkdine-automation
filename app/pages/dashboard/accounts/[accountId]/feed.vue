@@ -82,6 +82,18 @@
           </div>
         </div>
       </div>
+
+      <!-- Confirmation Modals -->
+      <BaseConfirmModal
+        :show="confirmModal.show"
+        :title="confirmModal.title"
+        :message="confirmModal.message"
+        :variant="confirmModal.variant"
+        :confirm-text="confirmModal.confirmText"
+        :loading="confirmModal.loading"
+        @confirm="confirmModal.onConfirm"
+        @cancel="confirmModal.show = false"
+      />
     </div>
   </NuxtLayout>
 </template>
@@ -97,6 +109,7 @@ import {
   Send,
   Edit3
 } from 'lucide-vue-next'
+import BaseConfirmModal from '~/components/BaseConfirmModal.vue'
 
 definePageMeta({
   layout: false,
@@ -109,6 +122,17 @@ const accountId = parseInt(route.params.accountId as string)
 const account = ref<any>(null)
 const feedPosts = ref<any[]>([])
 const loading = ref(true)
+
+// Confirmation Modal State
+const confirmModal = reactive({
+  show: false,
+  title: '',
+  message: '',
+  variant: 'primary',
+  confirmText: 'Confirmer',
+  loading: false,
+  onConfirm: () => {}
+})
 
 const fetchAccountData = async () => {
   loading.value = true
@@ -188,32 +212,50 @@ const updateDate = async (post: any, newDate: string) => {
   }
 }
 
-const publishNow = async (post: any) => {
-  if (!confirm('Voulez-vous vraiment publier ce post maintenant sur LinkedIn ?')) return
-  
-  post.publishing = true
-  try {
-    const data = await $fetch<any>(`/api/posts/${post.id}/publish`, {
-      method: 'POST'
-    })
-    post.status = 'published'
-    post.publishedAt = data.publishedAt
-  } catch (e) {
-    console.error('Failed to publish', e)
-    alert('Erreur lors de la publication. Vérifiez le scénario Make.com.')
-  } finally {
-    post.publishing = false
+const publishNow = (post: any) => {
+  confirmModal.title = 'Publier sur LinkedIn'
+  confirmModal.message = 'Voulez-vous vraiment publier ce post maintenant sur LinkedIn ? Cette action est immédiate.'
+  confirmModal.variant = 'success'
+  confirmModal.confirmText = 'Publier maintenant'
+  confirmModal.onConfirm = async () => {
+    confirmModal.loading = true
+    post.publishing = true
+    try {
+      const data = await $fetch<any>(`/api/posts/${post.id}/publish`, {
+        method: 'POST'
+      })
+      post.status = 'published'
+      post.publishedAt = data.publishedAt
+      confirmModal.show = false
+    } catch (e) {
+      console.error('Failed to publish', e)
+      alert('Erreur lors de la publication. Vérifiez le scénario Make.com.')
+    } finally {
+      post.publishing = false
+      confirmModal.loading = false
+    }
   }
+  confirmModal.show = true
 }
 
-const deletePost = async (id: number) => {
-  if (!confirm('Supprimer cette publication du feed ?')) return
-  try {
-    await $fetch(`/api/posts/${id}`, { method: 'DELETE' })
-    await fetchAccountData()
-  } catch (e) {
-    alert('Erreur lors de la suppression.')
+const deletePost = (id: number) => {
+  confirmModal.title = 'Supprimer la publication'
+  confirmModal.message = 'Êtes-vous sûr de vouloir supprimer cette publication du feed ?'
+  confirmModal.variant = 'danger'
+  confirmModal.confirmText = 'Supprimer'
+  confirmModal.onConfirm = async () => {
+    confirmModal.loading = true
+    try {
+      await $fetch(`/api/posts/${id}`, { method: 'DELETE' })
+      await fetchAccountData()
+      confirmModal.show = false
+    } catch (e) {
+      alert('Erreur lors de la suppression.')
+    } finally {
+      confirmModal.loading = false
+    }
   }
+  confirmModal.show = true
 }
 
 const formatDate = (dateString: string) => {

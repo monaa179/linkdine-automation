@@ -99,12 +99,25 @@
           </div>
         </form>
       </BaseModal>
+
+      <!-- Confirmation Modal -->
+      <BaseConfirmModal
+        :show="confirmModal.show"
+        :title="confirmModal.title"
+        :message="confirmModal.message"
+        :variant="confirmModal.variant"
+        :confirm-text="confirmModal.confirmText"
+        :loading="confirmModal.loading"
+        @confirm="confirmModal.onConfirm"
+        @cancel="confirmModal.show = false"
+      />
     </div>
   </NuxtLayout>
 </template>
 
 <script setup lang="ts">
 import { UserPlus, Trash2, Settings } from 'lucide-vue-next'
+import BaseConfirmModal from '~/components/BaseConfirmModal.vue'
 
 definePageMeta({
   layout: false,
@@ -119,6 +132,17 @@ const users = ref<any[]>([])
 const showModal = ref(false)
 const isEditing = ref(false)
 const currentUserId = ref<number | null>(null)
+
+// Confirmation Modal State
+const confirmModal = reactive({
+  show: false,
+  title: '',
+  message: '',
+  variant: 'primary',
+  confirmText: 'Confirmer',
+  loading: false,
+  onConfirm: () => {}
+})
 
 const form = reactive({
   email: '',
@@ -185,15 +209,24 @@ const handleSubmit = async () => {
   }
 }
 
-const confirmDelete = async (u: any) => {
-  if (confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur ${u.email} ?`)) {
+const confirmDelete = (u: any) => {
+  confirmModal.title = 'Supprimer l\'utilisateur'
+  confirmModal.message = `Êtes-vous sûr de vouloir supprimer l'utilisateur "${u.email}" ? Cette action est irréversible.`
+  confirmModal.variant = 'danger'
+  confirmModal.confirmText = 'Supprimer'
+  confirmModal.onConfirm = async () => {
+    confirmModal.loading = true
     try {
       await $fetch(`/api/users/${u.id}`, { method: 'DELETE' })
       await fetchUsers()
+      confirmModal.show = false
     } catch (e: any) {
       alert(e.data?.statusMessage || 'Erreur lors de la suppression')
+    } finally {
+      confirmModal.loading = false
     }
   }
+  confirmModal.show = true
 }
 
 const formatDate = (date: string) => {

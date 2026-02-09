@@ -59,7 +59,7 @@ const handleLogin = async () => {
   const result = await login(form)
   
   if (result.success) {
-    navigateTo('/dashboard')
+    navigateTo('/dashboard/accounts')
   } else {
     error.value = result.error || 'Connexion échouée'
     loading.value = false

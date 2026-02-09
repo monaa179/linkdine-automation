@@ -99,6 +99,18 @@
           </div>
         </div>
       </div>
+
+      <!-- Confirmation Modals -->
+      <BaseConfirmModal
+        :show="confirmModal.show"
+        :title="confirmModal.title"
+        :message="confirmModal.message"
+        :variant="confirmModal.variant"
+        :confirm-text="confirmModal.confirmText"
+        :loading="confirmModal.loading"
+        @confirm="confirmModal.onConfirm"
+        @cancel="confirmModal.show = false"
+      />
     </div>
   </NuxtLayout>
 </template>
@@ -112,6 +124,7 @@ import {
   Image, 
   Trash2 
 } from 'lucide-vue-next'
+import BaseConfirmModal from '~/components/BaseConfirmModal.vue'
 
 definePageMeta({
   layout: false,
@@ -129,6 +142,17 @@ const generating = ref(false)
 const dragover = ref(false)
 const selectedFiles = ref<any[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
+
+// Confirmation Modal State
+const confirmModal = reactive({
+  show: false,
+  title: '',
+  message: '',
+  variant: 'primary',
+  confirmText: 'Confirmer',
+  loading: false,
+  onConfirm: () => {}
+})
 
 const fetchAccountData = async () => {
   loading.value = true
@@ -193,31 +217,49 @@ const uploadImages = async () => {
   }
 }
 
-const triggerCaptionGeneration = async () => {
-  if (!confirm('Voulez-vous lancer la rédaction des captions pour toutes les images de la galerie ?')) return
-  
-  generating.value = true
-  try {
-    const res = await $fetch(`/api/accounts/${accountId}/generate-captions`, {
-      method: 'POST'
-    })
-    alert('Rédaction lancée avec succès ! Les images apparaîtront dans le Feed une fois terminées.')
-    await fetchAccountData()
-  } catch (e) {
-    alert('Erreur lors du lancement de la génération.')
-  } finally {
-    generating.value = false
+const triggerCaptionGeneration = () => {
+  confirmModal.title = 'Rédiger les captions'
+  confirmModal.message = 'Voulez-vous lancer la rédaction des captions pour toutes les images de la galerie ? Cela utilisera l\'IA pour analyser chaque photo.'
+  confirmModal.variant = 'primary'
+  confirmModal.confirmText = 'Lancer la rédaction'
+  confirmModal.onConfirm = async () => {
+    confirmModal.loading = true
+    generating.value = true
+    try {
+      await $fetch(`/api/accounts/${accountId}/generate-captions`, {
+        method: 'POST'
+      })
+      alert('Rédaction lancée avec succès ! Les images apparaîtront dans le Feed une fois terminées.')
+      await fetchAccountData()
+      confirmModal.show = false
+    } catch (e) {
+      alert('Erreur lors du lancement de la génération.')
+    } finally {
+      generating.value = false
+      confirmModal.loading = false
+    }
   }
+  confirmModal.show = true
 }
 
-const deletePost = async (id: number) => {
-  if (!confirm('Supprimer cette image de la galerie ?')) return
-  try {
-    await $fetch(`/api/posts/${id}`, { method: 'DELETE' })
-    await fetchAccountData()
-  } catch (e) {
-    alert('Erreur lors de la suppression.')
+const deletePost = (id: number) => {
+  confirmModal.title = 'Supprimer l\'image'
+  confirmModal.message = 'Êtes-vous sûr de vouloir supprimer cette image de la galerie ?'
+  confirmModal.variant = 'danger'
+  confirmModal.confirmText = 'Supprimer'
+  confirmModal.onConfirm = async () => {
+    confirmModal.loading = true
+    try {
+      await $fetch(`/api/posts/${id}`, { method: 'DELETE' })
+      await fetchAccountData()
+      confirmModal.show = false
+    } catch (e) {
+      alert('Erreur lors de la suppression.')
+    } finally {
+      confirmModal.loading = false
+    }
   }
+  confirmModal.show = true
 }
 
 onMounted(fetchAccountData)

@@ -13,6 +13,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
     // If authenticated and trying to access auth pages, redirect to dashboard
     if (user.value && to.path.startsWith('/auth')) {
-        return navigateTo('/dashboard')
+        return navigateTo('/dashboard/accounts')
     }
 })

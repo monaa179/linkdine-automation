@@ -32,7 +32,6 @@
 
 <script setup lang="ts">
 import { 
-  LayoutDashboard, 
   Link2, 
   Users,
   LogOut
@@ -42,7 +41,6 @@ const { user, logout } = useAuth()
 
 const menuItems = computed(() => {
   const items = [
-    { label: 'Tableau de bord', path: '/dashboard', icon: LayoutDashboard },
     { label: 'Comptes LinkedIn', path: '/dashboard/accounts', icon: Link2 },
   ]
 

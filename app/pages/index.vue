@@ -13,7 +13,7 @@ onMounted(async () => {
   }
 
   if (user.value) {
-    navigateTo('/dashboard')
+    navigateTo('/dashboard/accounts')
   } else {
     navigateTo('/auth/login')
   }

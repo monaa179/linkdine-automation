@@ -36,7 +36,12 @@
             <div class="account-avatar">{{ account.name[0] }}</div>
             <div class="account-meta">
               <h3>{{ account.name }}</h3>
-              <span class="badge">{{ account.postingPeriod }}</span>
+              <div class="account-badges">
+                <span class="badge">{{ account.postingPeriod }}</span>
+                <span class="badge gallery" v-if="account.stats?.galleryCount > 0">
+                  <Image :size="12" /> {{ account.stats.galleryCount }} photos
+                </span>
+              </div>
             </div>
             <div class="account-actions" @click.stop>
               <button class="icon-btn" title="Paramètres" @click="openSettings(account)">
@@ -45,6 +50,27 @@
               <button class="icon-btn delete" title="Supprimer" @click="confirmDelete(account)">
                 <Trash2 :size="18" />
               </button>
+            </div>
+          </div>
+
+          <div class="account-stats-grid">
+            <div class="stat-box">
+              <span class="stat-label">Dernier publié</span>
+              <span class="stat-value" v-if="account.stats?.lastPublished">
+                {{ formatDate(account.stats.lastPublished.publishedAt) }}
+              </span>
+              <span class="stat-value empty" v-else>Aucun</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Programmé</span>
+              <span class="stat-value" v-if="account.stats?.lastScheduled">
+                {{ formatDate(account.stats.lastScheduled.scheduledAt) }}
+              </span>
+              <span class="stat-value empty" v-else>Aucun</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Total publiés</span>
+              <span class="stat-value">{{ account.stats?.publishedCount || 0 }}</span>
             </div>
           </div>
 
@@ -61,7 +87,6 @@
               <span class="stat-label">Heure</span>
             </div>
           </div>
-          
         </BaseCard>
       </div>
 
@@ -159,13 +184,26 @@
           </div>
         </form>
       </BaseModal>
+
+      <!-- Confirmation Modals -->
+      <BaseConfirmModal
+        :show="confirmModal.show"
+        :title="confirmModal.title"
+        :message="confirmModal.message"
+        :variant="confirmModal.variant"
+        :confirm-text="confirmModal.confirmText"
+        :loading="confirmModal.loading"
+        @confirm="confirmModal.onConfirm"
+        @cancel="confirmModal.show = false"
+      />
     </div>
   </NuxtLayout>
 </template>
 
 <script setup lang="ts">
-import { Link2, Trash2, Settings, CheckCircle2, Sparkles, Calendar } from 'lucide-vue-next'
+import { Link2, Trash2, Settings, CheckCircle2, Sparkles, Calendar, Image } from 'lucide-vue-next'
 import BaseCheckboxGroup from '~/components/BaseCheckboxGroup.vue'
+import BaseConfirmModal from '~/components/BaseConfirmModal.vue'
 
 definePageMeta({
   layout: false,
@@ -196,6 +234,17 @@ const accounts = ref<any[]>([])
 const showAddModal = ref(false)
 const showEditModal = ref(false)
 const editAccount = ref<any>(null)
+
+// Confirmation Modal State
+const confirmModal = reactive({
+  show: false,
+  title: '',
+  message: '',
+  variant: 'primary',
+  confirmText: 'Confirmer',
+  loading: false,
+  onConfirm: () => {}
+})
 
 // Preview logic
 const updatePreview = async () => {
@@ -316,18 +365,27 @@ const openSettings = (account: any) => {
   })
 }
 
-const confirmDelete = async (account: any) => {
-  if (confirm(`Êtes-vous sûr de vouloir supprimer le compte "${account.name}" ?`)) {
+const confirmDelete = (account: any) => {
+  confirmModal.title = 'Supprimer le compte'
+  confirmModal.message = `Êtes-vous sûr de vouloir supprimer le compte "${account.name}" ? Cette action est irréversible.`
+  confirmModal.variant = 'danger'
+  confirmModal.confirmText = 'Supprimer'
+  confirmModal.onConfirm = async () => {
+    confirmModal.loading = true
     try {
       await $fetch(`/api/accounts/${account.id}`, { method: 'DELETE' })
       if (currentAccountId.value === account.id) {
         setCurrentAccountId(null)
       }
       await fetchAccounts()
+      confirmModal.show = false
     } catch (e) {
       alert('Erreur lors de la suppression')
+    } finally {
+      confirmModal.loading = false
     }
   }
+  confirmModal.show = true
 }
 
 const selectAccount = (account: any) => {
@@ -339,30 +397,36 @@ const goToAccountSpace = (accountId: number) => {
   router.push(`/dashboard/accounts/${accountId}/feed`)
 }
 
-const generatePosts = async (account: any) => {
-  if (!confirm(`Voulez-vous lancer la génération de publications pour "${account.name}" ?`)) return
-  
-  generating.value = true
-  try {
-    // 1. Enregistrer les modifications d'abord pour s'assurer que Make.com reçoit le dernier contextPrompt
-    await $fetch(`/api/accounts/${account.id}`, {
-      method: 'PATCH',
-      body: account
-    })
+const generatePosts = (account: any) => {
+  confirmModal.title = 'Générer des publications'
+  confirmModal.message = `Voulez-vous lancer la génération de publications pour "${account.name}" ? Cela utilisera l'IA pour créer de nouveaux contenus.`
+  confirmModal.variant = 'primary'
+  confirmModal.confirmText = 'Lancer la génération'
+  confirmModal.onConfirm = async () => {
+    confirmModal.loading = true
+    try {
+      // 1. Enregistrer les modifications d'abord for Make.com
+      await $fetch(`/api/accounts/${account.id}`, {
+        method: 'PATCH',
+        body: account
+      })
 
-    // 2. Lancer la génération
-    const response = await $fetch(`/api/accounts/${account.id}/generate`, {
-      method: 'POST'
-    })
-    alert('Génération lancée avec succès ! Consultez la liste des posts dans quelques instants.')
-    if (showEditModal.value) showEditModal.value = false
-    await fetchAccounts() // Refresh to show any changes
-  } catch (e: any) {
-    console.error('Generation failed', e)
-    alert(`Erreur lors de la génération: ${e.message || 'Erreur inconnue'}`)
-  } finally {
-    generating.value = false
+      // 2. Lancer la génération
+      await $fetch(`/api/accounts/${account.id}/generate`, {
+        method: 'POST'
+      })
+      alert('Génération lancée avec succès ! Consultez la liste des posts dans quelques instants.')
+      if (showEditModal.value) showEditModal.value = false
+      await fetchAccounts()
+      confirmModal.show = false
+    } catch (e: any) {
+      console.error('Generation failed', e)
+      alert(`Erreur lors de la génération: ${e.message || 'Erreur inconnue'}`)
+    } finally {
+      confirmModal.loading = false
+    }
   }
+  confirmModal.show = true
 }
 
 const formatDate = (dateString: string) => {
@@ -461,6 +525,19 @@ onMounted(fetchAccounts)
 
 .badge.personal { color: var(--accent-primary); background: rgba(59, 130, 246, 0.1); }
 .badge.company { color: var(--accent-secondary); background: rgba(139, 92, 246, 0.1); }
+.badge.gallery { 
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--warning); 
+  background: rgba(245, 158, 11, 0.1); 
+}
+
+.account-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
 
 .account-actions {
   display: flex;
@@ -524,6 +601,44 @@ onMounted(fetchAccounts)
   width: 1px;
   height: 30px;
   background: var(--border-glass);
+}
+
+.account-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.stat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-glass);
+}
+
+.stat-box .stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+}
+
+.stat-box .stat-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-box .stat-value.empty {
+  color: var(--text-secondary);
+  opacity: 0.5;
+  font-weight: 400;
 }
 
 
