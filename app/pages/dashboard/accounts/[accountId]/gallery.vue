@@ -92,6 +92,15 @@
           <div v-for="post in galleryPosts" :key="post.id" class="gallery-item glass">
             <img :src="post.imageUrl" alt="Gallery image" class="gallery-img" />
             <div class="item-overlay">
+              <button 
+                class="generate-btn" 
+                @click="generateSingleCaption(post.id)"
+                :disabled="post.generating"
+                title="Générer la caption"
+              >
+                <Sparkles v-if="!post.generating" :size="18" />
+                <div v-else class="spinner-small"></div>
+              </button>
               <button class="delete-btn" @click="deletePost(post.id)">
                 <Trash2 :size="18" />
               </button>
@@ -178,7 +187,12 @@ const fetchAccountData = async () => {
     account.value = await $fetch(`/api/accounts/${accountId}`)
     const allPosts = await $fetch<any[]>(`/api/posts?accountId=${accountId}`)
     // Gallery = posts without AI caption
-    galleryPosts.value = allPosts.filter(p => !p.aiCaption)
+    galleryPosts.value = allPosts
+      .filter(p => !p.aiCaption)
+      .map(p => ({
+        ...p,
+        generating: false
+      }))
   } catch (e) {
     console.error('Failed to fetch account data', e)
   } finally {
@@ -259,6 +273,44 @@ const triggerCaptionGeneration = () => {
       alert('Erreur lors du lancement de la génération.')
     } finally {
       generating.value = false
+      confirmModal.loading = false
+    }
+  }
+  confirmModal.show = true
+}
+
+const generateSingleCaption = (postId: number) => {
+  confirmModal.title = 'Générer la caption'
+  confirmModal.message = 'Vous vous apprêtez à générer une caption pour cette image via l\'IA. Êtes-vous sûr ?'
+  confirmModal.variant = 'primary'
+  confirmModal.confirmText = 'Générer'
+  confirmModal.onConfirm = async () => {
+    const post = galleryPosts.value.find(p => p.id === postId)
+    if (!post) return
+    
+    confirmModal.loading = true
+    post.generating = true
+    
+    try {
+      await $fetch(`/api/posts/${postId}/generate-caption`, {
+        method: 'POST'
+      })
+      
+      confirmModal.show = false
+      
+      // Show success modal
+      successModal.title = 'Caption en cours de génération !'
+      successModal.message = 'L\'image apparaîtra dans le Feed une fois la caption générée.'
+      successModal.buttonText = 'OK'
+      successModal.show = true
+      
+      // Refresh data to remove the image from gallery
+      await fetchAccountData()
+    } catch (e: any) {
+      alert(e.data?.statusMessage || 'Erreur lors de la génération de la caption.')
+      post.generating = false
+      confirmModal.show = false
+    } finally {
       confirmModal.loading = false
     }
   }
@@ -447,6 +499,7 @@ onMounted(fetchAccountData)
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
+  gap: 0.5rem;
   padding: 0.75rem;
   opacity: 0;
   transition: opacity var(--transition-fast);
@@ -454,6 +507,30 @@ onMounted(fetchAccountData)
 
 .gallery-item:hover .item-overlay {
   opacity: 1;
+}
+
+.generate-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.9);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.generate-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+  background: rgba(59, 130, 246, 1);
+}
+
+.generate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .delete-btn {
@@ -472,6 +549,19 @@ onMounted(fetchAccountData)
 
 .delete-btn:hover {
   transform: scale(1.1);
+}
+
+.spinner-small {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .empty-gallery {
