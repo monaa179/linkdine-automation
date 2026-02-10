@@ -111,6 +111,15 @@
         @confirm="confirmModal.onConfirm"
         @cancel="confirmModal.show = false"
       />
+
+      <!-- Success Modal -->
+      <BaseSuccessModal
+        :show="successModal.show"
+        :title="successModal.title"
+        :message="successModal.message"
+        :button-text="successModal.buttonText"
+        @close="successModal.show = false"
+      />
     </div>
   </NuxtLayout>
 </template>
@@ -125,6 +134,7 @@ import {
   Trash2 
 } from 'lucide-vue-next'
 import BaseConfirmModal from '~/components/BaseConfirmModal.vue'
+import BaseSuccessModal from '~/components/BaseSuccessModal.vue'
 
 definePageMeta({
   layout: false,
@@ -152,6 +162,14 @@ const confirmModal = reactive({
   confirmText: 'Confirmer',
   loading: false,
   onConfirm: () => {}
+})
+
+// Success Modal State
+const successModal = reactive({
+  show: false,
+  title: 'Succès !',
+  message: '',
+  buttonText: 'OK'
 })
 
 const fetchAccountData = async () => {
@@ -229,9 +247,14 @@ const triggerCaptionGeneration = () => {
       await $fetch(`/api/accounts/${accountId}/generate-captions`, {
         method: 'POST'
       })
-      alert('Rédaction lancée avec succès ! Les images apparaîtront dans le Feed une fois terminées.')
-      await fetchAccountData()
       confirmModal.show = false
+      await fetchAccountData()
+      
+      // Show success modal
+      successModal.title = 'Rédaction lancée avec succès !'
+      successModal.message = 'Les images apparaîtront dans le Feed une fois terminées.'
+      successModal.buttonText = 'OK'
+      successModal.show = true
     } catch (e) {
       alert('Erreur lors du lancement de la génération.')
     } finally {

@@ -172,14 +172,13 @@
 
           <div class="form-actions">
             <BaseButton 
-              type="button" 
-              variant="outline" 
-              block 
-              @click="generatePosts(editAccount)"
-              :loading="generating"
+              type="submit" 
+              variant="primary" 
+              block
+              :loading="saving"
             >
-              <Sparkles :size="18" />
-              Générer des publications
+              <Save :size="18" />
+              Sauvegarder
             </BaseButton>
           </div>
         </form>
@@ -201,7 +200,7 @@
 </template>
 
 <script setup lang="ts">
-import { Link2, Trash2, Settings, CheckCircle2, Sparkles, Calendar, Image } from 'lucide-vue-next'
+import { Link2, Trash2, Settings, CheckCircle2, Save, Calendar, Image } from 'lucide-vue-next'
 import BaseCheckboxGroup from '~/components/BaseCheckboxGroup.vue'
 import BaseConfirmModal from '~/components/BaseConfirmModal.vue'
 
@@ -228,7 +227,7 @@ const { currentAccountId, setCurrentAccountId } = useCurrentAccount()
 const router = useRouter()
 const loading = ref(true)
 const connecting = ref(false)
-const generating = ref(false)
+const saving = ref(false)
 const accounts = ref<any[]>([])
 
 const showAddModal = ref(false)
@@ -320,6 +319,7 @@ const handleAddAccount = async () => {
 
 const handleUpdateAccount = async () => {
   if (!editAccount.value) return
+  saving.value = true
   try {
     // Join selected days for backend
     if (editAccount.value.postingPeriod === 'week') {
@@ -330,21 +330,19 @@ const handleUpdateAccount = async () => {
       method: 'PATCH',
       body: editAccount.value
     })
-    // We don't close the modal anymore since it's auto-save
     await fetchAccounts()
+    showEditModal.value = false
   } catch (e) {
     console.error('Failed to update account', e)
+    alert('Erreur lors de la sauvegarde des modifications')
+  } finally {
+    saving.value = false
   }
 }
 
 watch([() => editAccount.value?.postingPeriod, () => editAccount.value?.postingFrequency, () => editAccount.value?.postingHour, selectedDaysEdit, () => editAccount.value?.postingDay], () => {
   updatePreview()
-  handleUpdateAccount()
 }, { deep: true })
-
-watch(() => editAccount.value?.name, () => handleUpdateAccount())
-watch(() => editAccount.value?.makeConnection, () => handleUpdateAccount())
-watch(() => editAccount.value?.contextPrompt, () => handleUpdateAccount())
 
 const connectNewAccount = () => {
   showAddModal.value = true
