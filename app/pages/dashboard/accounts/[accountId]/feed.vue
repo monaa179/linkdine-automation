@@ -54,7 +54,13 @@
               label="Légende (IA)" 
               placeholder="Modifier la légende..." 
               :rows="8"
+              :disabled="post.status === 'published'"
             />
+            
+            <div v-if="post.status === 'published'" class="readonly-notice">
+              <Lock :size="14" />
+              <span>Ce post a été publié et ne peut plus être modifié</span>
+            </div>
             
             <div class="editor-footer">
               <div class="footer-left">
@@ -107,7 +113,8 @@ import {
   CheckCircle2,
   Calendar,
   Send,
-  Edit3
+  Edit3,
+  Lock
 } from 'lucide-vue-next'
 import BaseConfirmModal from '~/components/BaseConfirmModal.vue'
 
@@ -145,9 +152,11 @@ const fetchAccountData = async () => {
       .map(p => ({
         ...p,
         editedCaption: p.editedCaption || p.aiCaption || '',
+        originalCaption: p.editedCaption || p.aiCaption || '', // Track original for comparison
         saving: false,
         saved: false,
-        publishing: false
+        publishing: false,
+        saveTimer: null // For debouncing
       }))
   } catch (e) {
     console.error('Failed to fetch account data', e)
@@ -156,18 +165,31 @@ const fetchAccountData = async () => {
   }
 }
 
-// Auto-save logic
-watch(feedPosts, (newPosts) => {
-  newPosts.forEach(post => {
-    // We use a simple way to detect changes: if the post is not currently saving and not already saved
-    // Actually, we need to track the individual values.
-  })
-}, { deep: true })
+// Debounced auto-save function
+const debouncedSave = (post: any) => {
+  // Clear existing timer
+  if (post.saveTimer) {
+    clearTimeout(post.saveTimer)
+  }
+  
+  // Set new timer for 1 second after user stops typing
+  post.saveTimer = setTimeout(() => {
+    if (post.editedCaption !== post.originalCaption) {
+      saveCaption(post)
+      post.originalCaption = post.editedCaption // Update original after save
+    }
+  }, 1000)
+}
 
 const saveCaption = async (post: any) => {
   if (post.saving) return
+  if (post.status === 'published') return // Don't save if published
+  
   post.saving = true
   post.saved = false
+  
+  const previousCaption = post.editedCaption
+  
   try {
     await $fetch(`/api/posts/${post.id}`, {
       method: 'PATCH',
@@ -176,6 +198,21 @@ const saveCaption = async (post: any) => {
         status: post.status // Maintain status
       }
     })
+    
+    // Save to history
+    try {
+      await $fetch(`/api/posts/${post.id}/history`, {
+        method: 'POST',
+        body: {
+          previousCaption: previousCaption,
+          newCaption: post.editedCaption
+        }
+      })
+    } catch (historyError) {
+      console.error('Failed to save history', historyError)
+      // Continue even if history save fails
+    }
+    
     post.saved = true
     setTimeout(() => { post.saved = false }, 3000)
   } catch (e) {
@@ -185,15 +222,24 @@ const saveCaption = async (post: any) => {
   }
 }
 
-// Add watchers for each post
-watch(() => feedPosts.value, (newVal, oldVal) => {
-  newVal.forEach((post, index) => {
-    const oldPost = oldVal && oldVal[index]
-    if (oldPost && post.editedCaption !== oldPost.editedCaption) {
-      saveCaption(post)
-    }
-  })
-}, { deep: true })
+// Watch for caption changes with deep reactivity
+watch(
+  () => feedPosts.value.map(p => ({ id: p.id, caption: p.editedCaption, status: p.status })),
+  (newValues, oldValues) => {
+    if (!oldValues) return
+    
+    newValues.forEach((newVal, index) => {
+      const oldVal = oldValues[index]
+      if (oldVal && newVal.caption !== oldVal.caption && newVal.status !== 'published') {
+        const post = feedPosts.value.find(p => p.id === newVal.id)
+        if (post) {
+          debouncedSave(post)
+        }
+      }
+    })
+  },
+  { deep: true }
+)
 
 const updateDate = async (post: any, newDate: string) => {
   if (!newDate) return
@@ -472,6 +518,20 @@ onMounted(fetchAccountData)
 @keyframes pulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 0.8; }
+}
+
+.readonly-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 0.5rem;
+  color: #f59e0b;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-top: 0.75rem;
 }
 
 @media (max-width: 900px) {
