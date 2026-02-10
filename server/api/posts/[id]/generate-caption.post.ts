@@ -9,10 +9,13 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: 'Invalid post ID' })
     }
 
-    // Get the post with its account
+    // Get the post with its account and module
     const post = await (prisma as any).post.findUnique({
         where: { id: postId },
-        include: { account: true }
+        include: {
+            account: true,
+            module: true
+        }
     })
 
     if (!post) {
@@ -24,19 +27,23 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: 'This post already has a caption' })
     }
 
-    const makeWebhookUrl = process.env.MAKE_GENERATE_CAPTION_WEBHOOK_URL
+    const makeWebhookUrl = process.env.MAKE_GENERATE_SINGLE_CAPTION_WEBHOOK_URL
     if (!makeWebhookUrl) {
         throw createError({ statusCode: 500, statusMessage: 'Make.com webhook URL not configured' })
     }
 
-    // Prepare payload for single image
+    // Prepare payload for single image with module and context
     const payload = {
         accountId: post.account.id,
         accountName: post.account.name,
         contextPrompt: post.account.contextPrompt,
         imageCount: 1,
         postId: post.id,
-        imageUrl: post.imageUrl
+        imageUrl: post.imageUrl,
+        moduleId: post.moduleId,
+        moduleName: post.module?.name || null,
+        moduleScript: post.module?.script || null,
+        imageContext: post.imageContext || null
     }
 
     console.log(`[Single Caption Generation] Triggering for post ${postId}`)

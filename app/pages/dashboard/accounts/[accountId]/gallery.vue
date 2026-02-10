@@ -92,18 +92,41 @@
           <div v-for="post in galleryPosts" :key="post.id" class="gallery-item glass">
             <img :src="post.imageUrl" alt="Gallery image" class="gallery-img" />
             <div class="item-overlay">
-              <button 
-                class="generate-btn" 
-                @click="generateSingleCaption(post.id)"
-                :disabled="post.generating"
-                title="Générer la caption"
-              >
-                <Sparkles v-if="!post.generating" :size="18" />
-                <div v-else class="spinner-small"></div>
-              </button>
-              <button class="delete-btn" @click="deletePost(post.id)">
-                <Trash2 :size="18" />
-              </button>
+              <div class="overlay-top">
+                <button 
+                  class="context-btn" 
+                  @click="openContextModal(post)"
+                  :class="{ 'has-context': post.imageContext }"
+                  title="Ajouter un contexte"
+                >
+                  <Edit3 :size="16" />
+                </button>
+                <button 
+                  class="generate-btn" 
+                  @click="generateSingleCaption(post.id)"
+                  :disabled="post.generating"
+                  title="Générer la caption"
+                >
+                  <Sparkles v-if="!post.generating" :size="18" />
+                  <div v-else class="spinner-small"></div>
+                </button>
+                <button class="delete-btn" @click="deletePost(post.id)">
+                  <Trash2 :size="18" />
+                </button>
+              </div>
+              <div class="overlay-bottom">
+                <select 
+                  class="module-select"
+                  :value="post.moduleId || ''"
+                  @change="updatePostModule(post.id, $event.target.value ? parseInt($event.target.value) : null)"
+                  @click.stop
+                >
+                  <option value="">Aucun module</option>
+                  <option v-for="module in modules" :key="module.id" :value="module.id">
+                    {{ module.name }}
+                  </option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -129,6 +152,39 @@
         :button-text="successModal.buttonText"
         @close="successModal.show = false"
       />
+
+      <!-- Context Modal -->
+      <BaseModal 
+        v-if="contextModal.show" 
+        title="Contexte de l'image" 
+        @close="closeContextModal"
+      >
+        <div class="context-form">
+          <p class="context-hint">Ajoutez des informations spécifiques sur cette image pour améliorer la génération de caption.</p>
+          <textarea 
+            v-model="contextModal.text"
+            class="context-textarea" 
+            rows="6"
+            placeholder="Ex: Photo prise lors de notre événement de lancement, mettre en avant l'ambiance conviviale et professionnelle..."
+          ></textarea>
+          <div class="context-actions">
+            <BaseButton 
+              v-if="contextModal.text"
+              variant="secondary" 
+              @click="clearContext"
+            >
+              Effacer
+            </BaseButton>
+            <BaseButton 
+              variant="primary" 
+              @click="saveContext"
+              :loading="contextModal.saving"
+            >
+              Enregistrer
+            </BaseButton>
+          </div>
+        </div>
+      </BaseModal>
     </div>
   </NuxtLayout>
 </template>
@@ -140,7 +196,8 @@ import {
   X, 
   Sparkles, 
   Image, 
-  Trash2 
+  Trash2,
+  Edit3 
 } from 'lucide-vue-next'
 import BaseConfirmModal from '~/components/BaseConfirmModal.vue'
 import BaseSuccessModal from '~/components/BaseSuccessModal.vue'
@@ -155,6 +212,7 @@ const accountId = parseInt(route.params.accountId as string)
 
 const account = ref<any>(null)
 const galleryPosts = ref<any[]>([])
+const modules = ref<any[]>([])
 const loading = ref(true)
 const uploading = ref(false)
 const generating = ref(false)
@@ -181,10 +239,19 @@ const successModal = reactive({
   buttonText: 'OK'
 })
 
+// Context Modal State
+const contextModal = reactive({
+  show: false,
+  postId: null as number | null,
+  text: '',
+  saving: false
+})
+
 const fetchAccountData = async () => {
   loading.value = true
   try {
     account.value = await $fetch(`/api/accounts/${accountId}`)
+    modules.value = await $fetch('/api/modules')
     const allPosts = await $fetch<any[]>(`/api/posts?accountId=${accountId}`)
     // Gallery = posts without AI caption
     galleryPosts.value = allPosts
@@ -335,6 +402,85 @@ const deletePost = (id: number) => {
     }
   }
   confirmModal.show = true
+}
+
+const updatePostModule = async (postId: number, moduleId: number | null) => {
+  try {
+    await $fetch(`/api/posts/${postId}`, {
+      method: 'PATCH',
+      body: { moduleId }
+    })
+    // Update local state
+    const post = galleryPosts.value.find(p => p.id === postId)
+    if (post) {
+      post.moduleId = moduleId
+    }
+  } catch (e) {
+    console.error('Failed to update post module', e)
+    alert('Erreur lors de la mise à jour du module')
+  }
+}
+
+const openContextModal = (post: any) => {
+  contextModal.postId = post.id
+  contextModal.text = post.imageContext || ''
+  contextModal.show = true
+}
+
+const closeContextModal = () => {
+  contextModal.show = false
+  contextModal.postId = null
+  contextModal.text = ''
+}
+
+const saveContext = async () => {
+  if (contextModal.postId === null) return
+  
+  contextModal.saving = true
+  try {
+    await $fetch(`/api/posts/${contextModal.postId}`, {
+      method: 'PATCH',
+      body: { imageContext: contextModal.text || null }
+    })
+    
+    // Update local state
+    const post = galleryPosts.value.find(p => p.id === contextModal.postId)
+    if (post) {
+      post.imageContext = contextModal.text || null
+    }
+    
+    closeContextModal()
+  } catch (e) {
+    console.error('Failed to save context', e)
+    alert('Erreur lors de la sauvegarde du contexte')
+  } finally {
+    contextModal.saving = false
+  }
+}
+
+const clearContext = async () => {
+  if (contextModal.postId === null) return
+  
+  contextModal.saving = true
+  try {
+    await $fetch(`/api/posts/${contextModal.postId}`, {
+      method: 'PATCH',
+      body: { imageContext: null }
+    })
+    
+    // Update local state
+    const post = galleryPosts.value.find(p => p.id === contextModal.postId)
+    if (post) {
+      post.imageContext = null
+    }
+    
+    closeContextModal()
+  } catch (e) {
+    console.error('Failed to clear context', e)
+    alert('Erreur lors de la suppression du contexte')
+  } finally {
+    contextModal.saving = false
+  }
 }
 
 onMounted(fetchAccountData)
@@ -497,9 +643,8 @@ onMounted(fetchAccountData)
   bottom: 0;
   background: rgba(0, 0, 0, 0.4);
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 0.5rem;
+  flex-direction: column;
+  justify-content: space-between;
   padding: 0.75rem;
   opacity: 0;
   transition: opacity var(--transition-fast);
@@ -507,6 +652,18 @@ onMounted(fetchAccountData)
 
 .gallery-item:hover .item-overlay {
   opacity: 1;
+}
+
+.overlay-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.overlay-bottom {
+  display: flex;
+  align-items: flex-end;
 }
 
 .generate-btn {
@@ -549,6 +706,98 @@ onMounted(fetchAccountData)
 
 .delete-btn:hover {
   transform: scale(1.1);
+}
+
+.module-select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  backdrop-filter: blur(10px);
+}
+
+.module-select:hover {
+  border-color: var(--accent-primary);
+  background: rgba(15, 23, 42, 1);
+}
+
+.module-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.module-select option {
+  background: var(--bg-dark);
+  color: var(--text-primary);
+}
+
+.context-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.context-btn:hover {
+  transform: scale(1.1);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.context-btn.has-context {
+  background: rgba(139, 92, 246, 0.8);
+}
+
+.context-btn.has-context:hover {
+  background: rgba(139, 92, 246, 1);
+}
+
+.context-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.context-hint {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.context-textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  padding: 0.75rem;
+  width: 100%;
+  outline: none;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.context-textarea:focus {
+  border-color: var(--accent-primary);
+}
+
+.context-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
 }
 
 .spinner-small {

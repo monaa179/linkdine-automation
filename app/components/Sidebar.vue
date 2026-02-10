@@ -34,7 +34,8 @@
 import { 
   Link2, 
   Users,
-  LogOut
+  LogOut,
+  FileText
 } from 'lucide-vue-next'
 
 const { user, logout } = useAuth()
@@ -42,6 +43,7 @@ const { user, logout } = useAuth()
 const menuItems = computed(() => {
   const items = [
     { label: 'Comptes LinkedIn', path: '/dashboard/accounts', icon: Link2 },
+    { label: 'Modules', path: '/dashboard/modules', icon: FileText },
   ]
 
   if (user.value?.role === 'admin') {

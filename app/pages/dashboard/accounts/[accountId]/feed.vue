@@ -29,18 +29,24 @@
           </div>
           <div class="feed-editor">
             <div class="editor-header">
-              <div class="date-badge-container">
-                <input 
-                  type="datetime-local" 
-                  class="date-input-hidden" 
-                  :id="'date-' + post.id"
-                  @change="(e) => updateDate(post, (e.target as HTMLInputElement).value)"
-                />
-                <label :for="'date-' + post.id" class="date-badge" :class="{ scheduled: post.scheduledAt, warning: !post.scheduledAt }">
-                  <Calendar :size="14" />
-                  <span>{{ post.scheduledAt ? 'Prévu le ' + formatDate(post.scheduledAt) : 'Non planifié' }}</span>
-                  <Edit3 :size="12" class="edit-icon" />
-                </label>
+              <div class="header-badges">
+                <div class="date-badge-container">
+                  <input 
+                    type="datetime-local" 
+                    class="date-input-hidden" 
+                    :id="'date-' + post.id"
+                    @change="(e) => updateDate(post, (e.target as HTMLInputElement).value)"
+                  />
+                  <label :for="'date-' + post.id" class="date-badge" :class="{ scheduled: post.scheduledAt, warning: !post.scheduledAt }">
+                    <Calendar :size="14" />
+                    <span>{{ post.scheduledAt ? 'Prévu le ' + formatDate(post.scheduledAt) : 'Non planifié' }}</span>
+                    <Edit3 :size="12" class="edit-icon" />
+                  </label>
+                </div>
+                <div v-if="post.module" class="module-badge">
+                  <Layers :size="14" />
+                  <span>{{ post.module.name }}</span>
+                </div>
               </div>
               <div class="item-actions">
                  <button class="delete-icon" @click="deletePost(post.id)">
@@ -114,7 +120,8 @@ import {
   Calendar,
   Send,
   Edit3,
-  Lock
+  Lock,
+  Layers
 } from 'lucide-vue-next'
 import BaseConfirmModal from '~/components/BaseConfirmModal.vue'
 
@@ -461,6 +468,25 @@ onMounted(fetchAccountData)
 }
 
 .date-badge span {
+  font-weight: 500;
+}
+
+.header-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.module-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 20px;
+  background: rgba(139, 92, 246, 0.1);
+  color: #8b5cf6;
+  border: 1px solid rgba(139, 92, 246, 0.2);
   font-weight: 500;
 }
 

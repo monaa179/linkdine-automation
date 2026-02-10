@@ -12,7 +12,8 @@ export default defineEventHandler(async (event) => {
             accountId: accountId
         },
         include: {
-            account: true
+            account: true,
+            module: true
         },
         orderBy: {
             createdAt: 'desc'
