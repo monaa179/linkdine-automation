@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
             userEmail: p.account.user.email,
             accountName: p.account.name,
             imageUrl: p.imageUrl.startsWith('http') ? p.imageUrl : `${appUrl}${p.imageUrl}`,
-            caption: p.editedCaption || p.aiCaption,
+            caption: p.aiCaption,
             scheduledAt: p.scheduledAt,
             makeConnection: p.account.makeConnection
         }))

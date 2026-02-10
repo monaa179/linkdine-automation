@@ -50,8 +50,8 @@
             </div>
             
             <BaseTextArea 
-              v-model="post.editedCaption" 
-              label="Légende (IA)" 
+              v-model="post.aiCaption" 
+              label="Légende" 
               placeholder="Modifier la légende..." 
               :rows="8"
               :disabled="post.status === 'published'"
@@ -148,11 +148,11 @@ const fetchAccountData = async () => {
     const allPosts = await $fetch<any[]>(`/api/posts?accountId=${accountId}`)
     // Feed = posts with AI caption
     feedPosts.value = allPosts
-      .filter(p => p.aiCaption || p.editedCaption)
+      .filter(p => p.aiCaption)
       .map(p => ({
         ...p,
-        editedCaption: p.editedCaption || p.aiCaption || '',
-        originalCaption: p.editedCaption || p.aiCaption || '', // Track original for comparison
+        aiCaption: p.aiCaption || '',
+        originalCaption: p.aiCaption || '', // Track original for comparison
         saving: false,
         saved: false,
         publishing: false,
@@ -174,9 +174,9 @@ const debouncedSave = (post: any) => {
   
   // Set new timer for 1 second after user stops typing
   post.saveTimer = setTimeout(() => {
-    if (post.editedCaption !== post.originalCaption) {
+    if (post.aiCaption !== post.originalCaption) {
       saveCaption(post)
-      post.originalCaption = post.editedCaption // Update original after save
+      post.originalCaption = post.aiCaption // Update original after save
     }
   }, 1000)
 }
@@ -188,13 +188,13 @@ const saveCaption = async (post: any) => {
   post.saving = true
   post.saved = false
   
-  const previousCaption = post.editedCaption
+  const previousCaption = post.originalCaption
   
   try {
     await $fetch(`/api/posts/${post.id}`, {
       method: 'PATCH',
       body: { 
-        editedCaption: post.editedCaption,
+        aiCaption: post.aiCaption,
         status: post.status // Maintain status
       }
     })
@@ -205,7 +205,7 @@ const saveCaption = async (post: any) => {
         method: 'POST',
         body: {
           previousCaption: previousCaption,
-          newCaption: post.editedCaption
+          newCaption: post.aiCaption
         }
       })
     } catch (historyError) {
@@ -224,7 +224,7 @@ const saveCaption = async (post: any) => {
 
 // Watch for caption changes with deep reactivity
 watch(
-  () => feedPosts.value.map(p => ({ id: p.id, caption: p.editedCaption, status: p.status })),
+  () => feedPosts.value.map(p => ({ id: p.id, caption: p.aiCaption, status: p.status })),
   (newValues, oldValues) => {
     if (!oldValues) return
     

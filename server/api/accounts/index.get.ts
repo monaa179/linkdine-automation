@@ -36,8 +36,7 @@ export default defineEventHandler(async (event) => {
         const galleryCount = await prisma.post.count({
             where: {
                 accountId: account.id,
-                aiCaption: null,
-                editedCaption: null
+                aiCaption: null
             }
         })
 

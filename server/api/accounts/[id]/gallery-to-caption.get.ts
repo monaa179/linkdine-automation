@@ -19,8 +19,7 @@ export default defineEventHandler(async (event) => {
     const posts = await (prisma as any).post.findMany({
         where: {
             accountId: id,
-            aiCaption: null,
-            editedCaption: null
+            aiCaption: null
         },
         select: {
             id: true,

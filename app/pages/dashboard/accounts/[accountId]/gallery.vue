@@ -178,7 +178,7 @@ const fetchAccountData = async () => {
     account.value = await $fetch(`/api/accounts/${accountId}`)
     const allPosts = await $fetch<any[]>(`/api/posts?accountId=${accountId}`)
     // Gallery = posts without AI caption
-    galleryPosts.value = allPosts.filter(p => !p.aiCaption && !p.editedCaption)
+    galleryPosts.value = allPosts.filter(p => !p.aiCaption)
   } catch (e) {
     console.error('Failed to fetch account data', e)
   } finally {

@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
     const updatedPost = await prisma.post.update({
         where: { id },
         data: {
-            editedCaption: body.editedCaption,
+            aiCaption: body.aiCaption,
             status: body.status,
             scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : undefined
         }

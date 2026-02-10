@@ -43,10 +43,7 @@ export default defineEventHandler(async (event) => {
                 { status: 'scheduled' },
                 {
                     status: 'draft',
-                    OR: [
-                        { aiCaption: { not: null } },
-                        { editedCaption: { not: null } }
-                    ]
+                    aiCaption: { not: null }
                 }
             ]
         },

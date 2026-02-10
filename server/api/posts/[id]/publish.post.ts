@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
         postId: post.id,
         accountName: post.account.name,
         imageUrl: `${appUrl}${post.imageUrl}`,
-        caption: post.editedCaption || post.aiCaption,
+        caption: post.aiCaption,
         makeConnection: (post.account as any).makeConnection,
         webhookSecret: process.env.MAKE_WEBHOOK_SECRET
     }

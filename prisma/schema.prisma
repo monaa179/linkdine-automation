@@ -40,7 +40,6 @@ model Post {
   id              Int              @id @default(autoincrement())
   imageUrl        String
   aiCaption       String?          @db.Text
-  editedCaption   String?          @db.Text
   status          PostStatus       @default(draft)
   scheduledAt     DateTime?
   publishedAt     DateTime?

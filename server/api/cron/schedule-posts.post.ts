@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
             accountId: post.linkedinAccountId,
             accountName: post.account.name,
             imageUrl: post.imageUrl.startsWith('http') ? post.imageUrl : `${appUrl}${post.imageUrl}`,
-            caption: post.editedCaption || post.aiCaption,
+            caption: post.aiCaption,
             makeConnection: post.account.makeConnection,
             scheduledAt: post.scheduledAt
         }))
