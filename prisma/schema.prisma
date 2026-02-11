@@ -37,18 +37,18 @@ model Account {
 }
 
 model Post {
-  id              Int              @id @default(autoincrement())
-  imageUrl        String
-  aiCaption       String?          @db.Text
-  imageContext    String?          @db.Text
-  status          PostStatus       @default(draft)
-  scheduledAt     DateTime?
-  publishedAt     DateTime?
-  createdAt       DateTime         @default(now())
-  accountId       Int
-  account         Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  modules         Module[]
-  captionHistory  CaptionHistory[]
+  id             Int              @id @default(autoincrement())
+  imageUrl       String
+  aiCaption      String?          @db.Text
+  status         PostStatus       @default(draft)
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  accountId      Int
+  imageContext   String?          @db.Text
+  captionHistory CaptionHistory[]
+  account        Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  modules        Module[]         @relation("ModuleToPost")
 
   @@index([accountId], map: "posts_accountId_fkey")
   @@map("posts")
@@ -59,7 +59,7 @@ model Module {
   name      String
   script    String   @db.Text
   createdAt DateTime @default(now())
-  posts     Post[]
+  posts     Post[]   @relation("ModuleToPost")
 
   @@map("modules")
 }
