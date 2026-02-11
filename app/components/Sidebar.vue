@@ -3,7 +3,7 @@
     <div class="sidebar-header">
       <div class="logo">
         <span class="logo-icon">LA</span>
-        <span class="logo-text">Automation</span>
+        <span class="logo-text">LinkedIn Automation</span>
       </div>
     </div>
 
