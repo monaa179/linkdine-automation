@@ -35,7 +35,9 @@ export default defineEventHandler(async (event) => {
             aiCaption: body.aiCaption,
             status: body.status,
             scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : undefined,
-            moduleId: body.moduleId !== undefined ? body.moduleId : undefined,
+            modules: body.moduleIds !== undefined ? {
+                set: body.moduleIds.map((id: number) => ({ id }))
+            } : undefined,
             imageContext: body.imageContext !== undefined ? body.imageContext : undefined
         }
     })

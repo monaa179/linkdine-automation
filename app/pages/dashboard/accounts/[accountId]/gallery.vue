@@ -115,22 +115,48 @@
                 </button>
               </div>
               <div class="overlay-bottom">
-                <select 
-                  class="module-select"
-                  :value="post.moduleId || ''"
-                  @change="updatePostModule(post.id, $event.target.value ? parseInt($event.target.value) : null)"
-                  @click.stop
+                <button 
+                  class="modules-trigger-btn" 
+                  @click="openModulesModal(post)"
+                  :class="{ 'has-modules': post.moduleIds?.length > 0 }"
+                  title="Gérer les modules"
                 >
-                  <option value="">Aucun module</option>
-                  <option v-for="module in modules" :key="module.id" :value="module.id">
-                    {{ module.name }}
-                  </option>
-                </select>
+                  <component :is="Package" :size="16" v-if="post.moduleIds?.length === 0" />
+                  <span v-else class="count-badge">{{ post.moduleIds.length }}</span>
+                  <span class="btn-text">Modules</span>
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Modules Selection Modal -->
+      <BaseModal 
+        v-if="modulesModal.show" 
+        title="Modules associés" 
+        @close="closeModulesModal"
+      >
+        <div class="modules-form">
+          <p class="context-hint">Sélectionnez les modules à appliquer pour la génération de la caption de cette image.</p>
+          
+          <BaseCheckboxGroup
+            v-model="modulesModal.selectedIds"
+            :options="modules.map(m => ({ label: m.name, value: m.id.toString() }))"
+            label="Modules disponibles"
+          />
+
+          <div class="context-actions">
+            <BaseButton 
+              variant="primary" 
+              @click="saveModules"
+              :loading="modulesModal.saving"
+            >
+              Enregistrer
+            </BaseButton>
+          </div>
+        </div>
+      </BaseModal>
 
       <!-- Confirmation Modals -->
       <BaseConfirmModal
@@ -197,8 +223,10 @@ import {
   Sparkles, 
   Image, 
   Trash2,
-  Edit3 
+  Edit3,
+  Package 
 } from 'lucide-vue-next'
+import BaseCheckboxGroup from '~/components/BaseCheckboxGroup.vue'
 import BaseConfirmModal from '~/components/BaseConfirmModal.vue'
 import BaseSuccessModal from '~/components/BaseSuccessModal.vue'
 
@@ -247,6 +275,14 @@ const contextModal = reactive({
   saving: false
 })
 
+// Modules Modal State
+const modulesModal = reactive({
+  show: false,
+  postId: null as number | null,
+  selectedIds: [] as string[],
+  saving: false
+})
+
 const fetchAccountData = async () => {
   loading.value = true
   try {
@@ -258,7 +294,8 @@ const fetchAccountData = async () => {
       .filter(p => !p.aiCaption)
       .map(p => ({
         ...p,
-        generating: false
+        generating: false,
+        moduleIds: (p.modules || []).map((m: any) => m.id)
       }))
   } catch (e) {
     console.error('Failed to fetch account data', e)
@@ -404,20 +441,41 @@ const deletePost = (id: number) => {
   confirmModal.show = true
 }
 
-const updatePostModule = async (postId: number, moduleId: number | null) => {
+const openModulesModal = (post: any) => {
+  modulesModal.postId = post.id
+  modulesModal.selectedIds = (post.moduleIds || []).map((id: number) => id.toString())
+  modulesModal.show = true
+}
+
+const closeModulesModal = () => {
+  modulesModal.show = false
+  modulesModal.postId = null
+  modulesModal.selectedIds = []
+}
+
+const saveModules = async () => {
+  if (modulesModal.postId === null) return
+  
+  modulesModal.saving = true
   try {
-    await $fetch(`/api/posts/${postId}`, {
+    const moduleIds = modulesModal.selectedIds.map(id => parseInt(id))
+    await $fetch(`/api/posts/${modulesModal.postId}`, {
       method: 'PATCH',
-      body: { moduleId }
+      body: { moduleIds }
     })
+    
     // Update local state
-    const post = galleryPosts.value.find(p => p.id === postId)
+    const post = galleryPosts.value.find(p => p.id === modulesModal.postId)
     if (post) {
-      post.moduleId = moduleId
+      post.moduleIds = moduleIds
     }
+    
+    closeModulesModal()
   } catch (e) {
-    console.error('Failed to update post module', e)
-    alert('Erreur lors de la mise à jour du module')
+    console.error('Failed to save modules', e)
+    alert('Erreur lors de la sauvegarde des modules')
+  } finally {
+    modulesModal.saving = false
   }
 }
 
@@ -708,33 +766,51 @@ onMounted(fetchAccountData)
   transform: scale(1.1);
 }
 
-.module-select {
+.modules-trigger-btn {
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  background: rgba(15, 23, 42, 0.95);
+  padding: 0.625rem;
+  background: rgba(15, 23, 42, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   color: var(--text-primary);
   font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   cursor: pointer;
   transition: all var(--transition-fast);
   backdrop-filter: blur(10px);
 }
 
-.module-select:hover {
+.modules-trigger-btn:hover {
   border-color: var(--accent-primary);
   background: rgba(15, 23, 42, 1);
+  transform: translateY(-2px);
 }
 
-.module-select:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+.modules-trigger-btn.has-modules {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
-.module-select option {
-  background: var(--bg-dark);
-  color: var(--text-primary);
+.count-badge {
+  background: var(--accent-primary);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modules-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .context-btn {

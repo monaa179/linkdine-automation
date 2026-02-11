@@ -46,13 +46,11 @@ model Post {
   publishedAt     DateTime?
   createdAt       DateTime         @default(now())
   accountId       Int
-  moduleId        Int?
   account         Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  module          Module?          @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  modules         Module[]
   captionHistory  CaptionHistory[]
 
   @@index([accountId], map: "posts_accountId_fkey")
-  @@index([moduleId], map: "posts_moduleId_fkey")
   @@map("posts")
 }
 

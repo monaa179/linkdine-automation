@@ -11,12 +11,12 @@ export default defineEventHandler(async (event) => {
     }
 
     // Verify account ownership and get posts with their modules
-    const account = await (prisma as any).account.findUnique({
+    const account = await prisma.account.findUnique({
         where: { id },
         include: {
             posts: {
                 where: { aiCaption: null },
-                include: { module: true }
+                include: { modules: true }
             }
         }
     })
@@ -45,9 +45,9 @@ export default defineEventHandler(async (event) => {
         posts: postsToProcess.map((post: any) => ({
             postId: post.id,
             imageUrl: post.imageUrl,
-            moduleId: post.moduleId,
-            moduleName: post.module?.name || null,
-            moduleScript: post.module?.script || null,
+            moduleIds: post.modules.map((m: any) => m.id),
+            moduleNames: post.modules.map((m: any) => m.name).join(', '),
+            moduleScript: post.modules.map((m: any) => m.script).join('\n\n---\n\n'),
             imageContext: post.imageContext || null
         }))
     }

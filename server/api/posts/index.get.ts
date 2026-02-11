@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
         },
         include: {
             account: true,
-            module: true
+            modules: true
         },
         orderBy: {
             createdAt: 'desc'

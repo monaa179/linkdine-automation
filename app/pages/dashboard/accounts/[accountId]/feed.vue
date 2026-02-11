@@ -43,9 +43,9 @@
                     <Edit3 :size="12" class="edit-icon" />
                   </label>
                 </div>
-                <div v-if="post.module" class="module-badge">
+                <div v-for="module in post.modules" :key="module.id" class="module-badge">
                   <Layers :size="14" />
-                  <span>{{ post.module.name }}</span>
+                  <span>{{ module.name }}</span>
                 </div>
               </div>
               <div class="item-actions">

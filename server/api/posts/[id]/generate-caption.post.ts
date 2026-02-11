@@ -9,12 +9,12 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: 'Invalid post ID' })
     }
 
-    // Get the post with its account and module
-    const post = await (prisma as any).post.findUnique({
+    // Get the post with its account and modules
+    const post = await prisma.post.findUnique({
         where: { id: postId },
         include: {
             account: true,
-            module: true
+            modules: true
         }
     })
 
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 500, statusMessage: 'Make.com webhook URL not configured' })
     }
 
-    // Prepare payload for single image with module and context
+    // Prepare payload for single image with modules and context
     const payload = {
         accountId: post.account.id,
         accountName: post.account.name,
@@ -40,9 +40,9 @@ export default defineEventHandler(async (event) => {
         imageCount: 1,
         postId: post.id,
         imageUrl: post.imageUrl,
-        moduleId: post.moduleId,
-        moduleName: post.module?.name || null,
-        moduleScript: post.module?.script || null,
+        moduleIds: post.modules.map(m => m.id),
+        moduleNames: post.modules.map(m => m.name).join(', '),
+        moduleScript: post.modules.map(m => m.script).join('\n\n---\n\n'),
         imageContext: post.imageContext || null
     }
 
