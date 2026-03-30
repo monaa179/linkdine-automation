@@ -8,7 +8,9 @@
     "ngrok": "ngrok http 3000 --domain=romeo-syntypic-gruesomely.ngrok-free.dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed:admin": "tsx scripts/create-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
@@ -25,6 +27,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.2.0",
     "typescript": "^5.9.3",
+    "tsx": "^4.19.2",
     "vue-tsc": "^3.2.4"
   }
 }
